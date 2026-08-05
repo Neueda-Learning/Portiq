@@ -58,7 +58,8 @@ public class SecurityConfig {
                 "http://localhost:5500",
                 "http://127.0.0.1:3000",
                 "http://127.0.0.1:5173",
-                "http://127.0.0.1:5500"
+                "http://127.0.0.1:5500",
+                "https://portiq-amber.vercel.app"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
