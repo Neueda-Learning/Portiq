@@ -1,0 +1,7 @@
+target/
+backend-run.log
+.env
+*.log
+.idea/
+.vscode/
+*.iml
