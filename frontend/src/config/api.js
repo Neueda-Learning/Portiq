@@ -1,4 +1,4 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4001";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://portiq-nwbk.onrender.com";
 
 export const TOKEN_STORAGE_KEY = "portiq_token";
 
