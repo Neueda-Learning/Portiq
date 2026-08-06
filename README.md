@@ -136,9 +136,17 @@ Biometric login uses the browser's built-in WebAuthn API - no third-party servic
 ## Tests
 
 ```bash
-cd backend && mvn test      # 240 tests
+cd backend && mvn test      # 298 tests
 cd frontend && npm test     # 25 tests
 ```
+
+See [docs/TESTING.md](docs/TESTING.md) for what is tested and why, conventions, and the known gaps.
+
+## Contributing
+
+Short-lived branches off `main`, reviewed pull requests, delete on merge — see
+[docs/BRANCHING_STRATEGY.md](docs/BRANCHING_STRATEGY.md). The `backend`, `frontend`,
+`frontend-ci-setup` and `doc` branches are legacy and heavily divergent; do not branch from them.
 
 ## Logs
 

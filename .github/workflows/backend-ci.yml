@@ -12,6 +12,11 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
+  # The dependency scan also runs weekly. A CVE is published against a dependency we already
+  # have, not against a change we just made, so a scan that only runs on push would report a
+  # vulnerability whenever someone next happened to touch the backend - which could be weeks.
+  schedule:
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -61,6 +66,60 @@ jobs:
           name: portiq-backend-jar
           path: backend/target/*.jar
           retention-days: 7
+
+  dependency-scan:
+    name: Dependency CVE scan
+    runs-on: ubuntu-latest
+    # Runs alongside the tests rather than after them. It is the slowest job here and does not
+    # depend on the build, so gating it behind the test job would add several minutes to the
+    # feedback loop for no benefit.
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # The NVD database is the expensive part - minutes on a cold cache, seconds warm. Keyed by
+      # week so it refreshes regularly without a full re-download on every run.
+      - name: Cache the NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            nvd-${{ runner.os }}-
+
+      # Fails the build on any dependency scoring CVSS 7.0 or above - the threshold is set in
+      # the pom's `security` profile, so it stays identical to a local `mvn -Psecurity verify`.
+      #
+      # NVD_API_KEY is optional but strongly recommended: without it NVD rate-limits anonymous
+      # callers hard enough that the initial sync can take upwards of half an hour. Get one free
+      # at https://nvd.nist.gov/developers/request-an-api-key and add it as a repository secret.
+      - name: Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -Psecurity verify -DskipTests
+
+      # if: always() so the report is published when the scan FAILS, which is the only time
+      # anyone needs to read it - it names which dependency and which CVE.
+      - name: Upload the vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portiq-dependency-check-report
+          path: |
+            backend/target/dependency-check-report.html
+            backend/target/dependency-check-report.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   docker:
     name: Verify image builds
