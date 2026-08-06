@@ -133,17 +133,34 @@ INSIGHTS_VISION_MODEL=...   # vision-capable model, for statement image import
 
 Biometric login uses the browser's built-in WebAuthn API - no third-party service involved. After logging in with a password once, click **Enable Biometrics** in the top bar and follow your OS prompt (Windows Hello, Touch ID, etc). It requires a secure context, so `http://localhost` works but a plain-HTTP LAN address will not; deploy behind HTTPS for anything beyond local use, and update `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` to match your real domain.
 
-## Backend Tests
+## Tests
 
 ```bash
-cd backend
-mvn test
+cd backend && mvn test      # 240 tests
+cd frontend && npm test     # 25 tests
 ```
+
+## Logs
+
+Runtime logs are written to `logs/` (application, errors, and a separate security audit trail)
+and roll daily with a size cap. Build and run output can be captured too:
+
+```bash
+scripts/run-with-logs.sh all          # Linux / macOS / Git Bash
+.\scripts\run-with-logs.ps1 all       # Windows
+```
+
+Each log records the branch, commit and exit code, so an old one is still worth reading.
+See [logs/README.md](logs/README.md) for what goes where, retention, and how to read the audit
+trail.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for how the app addresses the OWASP Top 10, what each control does,
-and the known limitations. Two things to know before deploying:
+- [OWASP_TOP_10_COMPLIANCE.md](OWASP_TOP_10_COMPLIANCE.md) — category-by-category record of the
+  controls, the code that enforces them, and the tests that prove it
+- [SECURITY.md](SECURITY.md) — design rationale, configuration reference and known limitations
+
+Two things to know before deploying:
 
 - Under the `prod` profile the app **refuses to start** on the development defaults — `JWT_SECRET`,
   `DB_ENCRYPTION_KEY` and `OWNER_PASSWORD` must be set. It reports every missing one at once.

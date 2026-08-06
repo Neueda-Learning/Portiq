@@ -41,8 +41,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Runs before the build so a failing test stops the pipeline at the cheapest point.
+      - name: Test
+        run: npm run test:ci
+
       - name: Build
         run: npm run build
+
+      # if: always() so the report is still published when a test failed - which is exactly
+      # when someone needs to read it.
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portiq-frontend-test-report
+          path: logs/frontend-tests.xml
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

@@ -29,3 +29,8 @@ frontend/npm-install.log
 *.iml
 .DS_Store
 Thumbs.db
+
+# Logs. The directory structure is tracked (logs/README.md, logs/.gitkeep); the logs are not.
+logs/*
+!logs/README.md
+!logs/.gitkeep
