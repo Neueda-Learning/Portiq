@@ -44,12 +44,30 @@ class InsightsControllerTest {
     }
 
     @Test
-    void saysSoWhenTheFeatureIsNotConfigured() throws Exception {
+    void namesTheMissingVariableWhenTheFeatureIsNotConfigured() throws Exception {
+        // "Not configured on this server" on its own is a dead end: both halves have to be set,
+        // only one is usually forgotten, and the reader's next move was to go and read source.
         when(insightsService.isAvailable()).thenReturn(false);
+        when(insightsService.missingConfiguration()).thenReturn("INSIGHTS_API_KEY");
 
         mockMvc.perform(get("/api/insights/summary"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.message").value("Summaries are not configured on this server"));
+                .andExpect(jsonPath("$.message").value(
+                        "Summaries are not configured on this server. Set INSIGHTS_API_KEY "
+                                + "and restart the backend."));
+    }
+
+    @Test
+    void neverRendersTheWordNullWhenTheMissingVariableIsUnknown() throws Exception {
+        // Unreachable in practice, but "Set null and restart the backend" is a bad enough thing
+        // to show someone that it is worth making impossible rather than unlikely.
+        when(insightsService.isAvailable()).thenReturn(false);
+        when(insightsService.missingConfiguration()).thenReturn(null);
+
+        mockMvc.perform(get("/api/insights/summary"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("null"))));
     }
 
     @Test

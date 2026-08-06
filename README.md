@@ -142,6 +142,12 @@ cd frontend && npm test     # 25 tests
 
 See [docs/TESTING.md](docs/TESTING.md) for what is tested and why, conventions, and the known gaps.
 
+## Running it
+
+[docs/RUNNING_THE_APP.md](docs/RUNNING_THE_APP.md) — starting locally and on a VM, a ten-minute
+demo walkthrough, and troubleshooting (including how to switch the AI features on, which needs
+only `INSIGHTS_API_KEY`).
+
 ## Delivery board
 
 `docs/delivery-board.html` is a self-contained kanban board covering every capability in the

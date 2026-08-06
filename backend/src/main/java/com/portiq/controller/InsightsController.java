@@ -21,6 +21,20 @@ public class InsightsController {
 
     private static final Logger log = LoggerFactory.getLogger(InsightsController.class);
 
+    /**
+     * Builds the "not configured" message, naming the variable when it is known.
+     *
+     * <p>The null branch should be unreachable - a feature is only unavailable because something
+     * is missing - but a message reading "Set null and restart" is a bad enough thing to put in
+     * front of someone that it is worth one line to make impossible.
+     */
+    static String notConfiguredMessage(String feature, String missing) {
+        return missing == null || missing.isBlank()
+                ? feature + " are not configured on this server. See docs/RUNNING_THE_APP.md."
+                : feature + " are not configured on this server. Set " + missing
+                        + " and restart the backend.";
+    }
+
     private final InsightsService insightsService;
 
     public InsightsController(InsightsService insightsService) {
@@ -31,8 +45,11 @@ public class InsightsController {
     @Operation(summary = "Generate a short summary of current portfolio performance")
     public ResponseEntity<?> summary() {
         if (!insightsService.isAvailable()) {
+            // Naming the variable is the difference between a dead end and a fix. The names are
+            // in the public repository; no value is ever included.
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("message", "Summaries are not configured on this server"));
+                    .body(Map.of("message", notConfiguredMessage("Summaries",
+                            insightsService.missingConfiguration())));
         }
         try {
             return ResponseEntity.ok(Map.of("summary", insightsService.generateSummary()));

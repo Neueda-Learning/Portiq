@@ -32,6 +32,11 @@ public class StatementScanService {
         return chatCompletionClient.isConfigured();
     }
 
+    /** The environment variable that needs setting, or null when the feature is ready. */
+    public String missingConfiguration() {
+        return chatCompletionClient.missingConfiguration();
+    }
+
     public List<HoldingRequest> extractHoldings(MultipartFile file) throws IOException {
         String base64 = Base64.getEncoder().encodeToString(file.getBytes());
         String contentType = file.getContentType() != null ? file.getContentType() : "image/png";

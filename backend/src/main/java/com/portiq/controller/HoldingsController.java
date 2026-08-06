@@ -134,7 +134,9 @@ public class HoldingsController {
 
         if (isSpreadsheet) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("message",
-                    "Excel import needs the summary feature configured on this server (INSIGHTS_API_KEY) - upload a CSV instead"));
+                    "Excel import needs the AI features configured on this server. Set "
+                            + smartFileImportService.missingConfiguration()
+                            + " and restart the backend, or upload a CSV instead."));
         }
 
         try {
@@ -158,8 +160,9 @@ public class HoldingsController {
     @Operation(summary = "Import holdings by reading a statement screenshot")
     public ResponseEntity<?> importImage(@RequestParam("file") MultipartFile file) {
         if (!statementScanService.isAvailable()) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("message", "Image import is not configured on this server"));
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("message",
+                    "Statement image import is not configured on this server. Set "
+                            + statementScanService.missingConfiguration() + " and restart the backend."));
         }
         uploadValidator.validate(file, UploadValidator.Kind.IMAGE);
         try {

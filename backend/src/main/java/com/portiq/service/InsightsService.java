@@ -26,6 +26,11 @@ public class InsightsService {
         return chatCompletionClient.isConfigured();
     }
 
+    /** The environment variable that needs setting, or null when the feature is ready. */
+    public String missingConfiguration() {
+        return chatCompletionClient.missingConfiguration();
+    }
+
     public String generateSummary() {
         PerformanceSummary summary = holdingService.getAggregatePerformance();
 
