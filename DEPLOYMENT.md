@@ -256,6 +256,28 @@ Add Credentials. Each is kind **Secret text**, and the ID must match exactly:
 Use the same values as the manual `.env.prod` run, or the existing database
 volume will reject the new credentials.
 
+**Optional: enable the AI features.** The portfolio summary and the statement
+image import call an OpenAI-compatible endpoint. Without a key they report "not
+configured" and nothing else is affected — recommendations and risk scores are
+computed in Java and never need one. To turn them on, put the key in a file on
+the deployment host:
+
+```bash
+sudo install -d -m 750 -o jenkins -g jenkins /etc/portiq
+sudo -u jenkins tee /etc/portiq/insights.env > /dev/null <<'EOF'
+INSIGHTS_API_KEY=your-key-here
+EOF
+sudo chmod 640 /etc/portiq/insights.env
+```
+
+The pipeline sources this file at deploy time if it exists. It lives on the host
+rather than in Jenkins credentials on purpose: a credential named in the
+`Jenkinsfile` environment block must exist or the build aborts before it starts,
+which would make an optional feature mandatory for anyone deploying this repo.
+`INSIGHTS_API_URL` and the model names already default to Groq in
+`docker-compose.prod.yml`; override them in the same file for a different
+provider.
+
 **5. Create the job.** New Item → **Pipeline** → name it `portiq-cd`.
 
 - Under **Pipeline**, choose *Pipeline script from SCM*

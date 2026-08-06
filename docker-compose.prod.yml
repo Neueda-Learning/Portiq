@@ -52,11 +52,15 @@ services:
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Portiq}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:8090}
-      # Optional - summary and image import degrade gracefully when unset.
+      # Optional - the summary and image import report "not configured" and the
+      # rest of the app is unaffected when the key is absent. The model names
+      # need real defaults rather than empty ones: an empty environment variable
+      # still overrides the fallback in application.properties, so passing ""
+      # would leave the model unset even once a key is supplied.
       INSIGHTS_API_KEY: ${INSIGHTS_API_KEY:-}
-      INSIGHTS_API_URL: ${INSIGHTS_API_URL:-}
-      INSIGHTS_MODEL: ${INSIGHTS_MODEL:-}
-      INSIGHTS_VISION_MODEL: ${INSIGHTS_VISION_MODEL:-}
+      INSIGHTS_API_URL: ${INSIGHTS_API_URL:-https://api.groq.com/openai/v1/chat/completions}
+      INSIGHTS_MODEL: ${INSIGHTS_MODEL:-llama-3.3-70b-versatile}
+      INSIGHTS_VISION_MODEL: ${INSIGHTS_VISION_MODEL:-qwen/qwen3.6-27b}
       ANALYTICS_BENCHMARK: ${ANALYTICS_BENCHMARK:-^NSEI}
       ANALYTICS_RISK_FREE_RATE: ${ANALYTICS_RISK_FREE_RATE:-6.5}
     expose:

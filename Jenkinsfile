@@ -72,6 +72,25 @@ pipeline {
             steps {
                 sh '''
                     set -eu
+
+                    # Optional AI features - the portfolio summary and statement
+                    # image import. Read from a file on the host rather than a
+                    # Jenkins credential precisely because they are optional: a
+                    # missing credential in the environment block above aborts
+                    # the whole build, whereas a deployment with no key here just
+                    # reports "not configured" for those two features and works
+                    # normally otherwise. Create it with:
+                    #   sudo install -d -m 750 -o jenkins -g jenkins /etc/portiq
+                    #   sudo -u jenkins tee /etc/portiq/insights.env <<'EOF'
+                    #   INSIGHTS_API_KEY=...
+                    #   EOF
+                    if [ -f /etc/portiq/insights.env ]; then
+                        echo "Loading optional AI configuration"
+                        set -a; . /etc/portiq/insights.env; set +a
+                    else
+                        echo "No /etc/portiq/insights.env - AI features stay disabled"
+                    fi
+
                     docker compose up -d --remove-orphans
                     docker compose ps
                 '''
