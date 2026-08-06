@@ -2,9 +2,23 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: [backend]
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
-    branches: [backend]
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -39,7 +53,7 @@ jobs:
   deploy:
     name: Deploy to Render
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/backend'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render deploy hook
