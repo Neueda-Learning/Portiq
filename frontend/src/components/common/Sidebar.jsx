@@ -54,6 +54,14 @@ function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
             <span className="nav-icon">&#9636;</span>
             <span className="nav-label">Holdings</span>
           </NavLink>
+          <NavLink to="/recommendations" onClick={onCloseMobile} title="Recommendations">
+            <span className="nav-icon">&#9678;</span>
+            <span className="nav-label">Recommendations</span>
+          </NavLink>
+          <NavLink to="/risk" onClick={onCloseMobile} title="Risk">
+            <span className="nav-icon">&#9650;</span>
+            <span className="nav-label">Risk</span>
+          </NavLink>
         </nav>
 
         <div className="sidebar-footer">
