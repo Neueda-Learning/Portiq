@@ -1,6 +1,7 @@
 package com.portiq.service;
 
 import com.portiq.dto.DailySeries;
+import com.portiq.security.OutboundUrlGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -11,8 +12,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriUtils;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +39,13 @@ public class MarketDataFetcher {
 
     private static final String CHART_API = "https://query1.finance.yahoo.com/v8/finance/chart/";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+    private final OutboundUrlGuard urlGuard;
+
+    public MarketDataFetcher(RestTemplate restTemplate, OutboundUrlGuard urlGuard) {
+        this.restTemplate = restTemplate;
+        this.urlGuard = urlGuard;
+    }
 
     @Cacheable(value = "dailySeries", key = "#ticker", unless = "#result.isEmpty()")
     @SuppressWarnings("unchecked")
@@ -47,8 +57,18 @@ public class MarketDataFetcher {
             headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
             headers.set("Accept", "application/json");
 
-            String url = CHART_API + ticker + "?range=1y&interval=1d";
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            // The ticker is a path segment, so it is encoded rather than concatenated: a raw value
+            // containing '?', '#' or '..' would otherwise rewrite the query or climb out of the
+            // chart endpoint into a different Yahoo API. Encoding pins it to the one segment it is
+            // meant to fill. The URI is built pre-encoded so RestTemplate does not encode it twice.
+            String url = CHART_API + UriUtils.encodePathSegment(ticker, StandardCharsets.UTF_8)
+                    + "?range=1y&interval=1d";
+            if (!urlGuard.isAllowed(url)) {
+                return DailySeries.empty(ticker);
+            }
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    URI.create(url), HttpMethod.GET, new HttpEntity<>(headers), Map.class);
 
             Map<String, Object> body = response.getBody();
             if (body == null) return DailySeries.empty(ticker);

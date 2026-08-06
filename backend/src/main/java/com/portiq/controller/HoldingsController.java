@@ -13,6 +13,7 @@ import com.portiq.service.PortfolioService;
 import com.portiq.service.PriceHistoryService;
 import com.portiq.service.SmartFileImportService;
 import com.portiq.service.StatementScanService;
+import com.portiq.service.UploadValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -44,11 +45,12 @@ public class HoldingsController {
     private final SmartFileImportService smartFileImportService;
     private final ExportService exportService;
     private final PriceHistoryService priceHistoryService;
+    private final UploadValidator uploadValidator;
 
     public HoldingsController(HoldingService holdingService, PortfolioService portfolioService,
                                HoldingImportService holdingImportService, StatementScanService statementScanService,
                                SmartFileImportService smartFileImportService, ExportService exportService,
-                               PriceHistoryService priceHistoryService) {
+                               PriceHistoryService priceHistoryService, UploadValidator uploadValidator) {
         this.holdingService = holdingService;
         this.portfolioService = portfolioService;
         this.holdingImportService = holdingImportService;
@@ -56,6 +58,7 @@ public class HoldingsController {
         this.smartFileImportService = smartFileImportService;
         this.exportService = exportService;
         this.priceHistoryService = priceHistoryService;
+        this.uploadValidator = uploadValidator;
     }
 
     @GetMapping
@@ -95,7 +98,9 @@ public class HoldingsController {
     @PostMapping(value = "/import/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Import holdings from a CSV or Excel file (any column layout), merging duplicate tickers")
     public ResponseEntity<?> importCsv(@RequestParam("file") MultipartFile file) {
-        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        uploadValidator.validate(file, UploadValidator.Kind.SPREADSHEET);
+
+        String filename = UploadValidator.safeFilename(file.getOriginalFilename()).toLowerCase();
         boolean isSpreadsheet = filename.endsWith(".xlsx") || filename.endsWith(".xls");
 
         if (smartFileImportService.isAvailable()) {
@@ -136,6 +141,7 @@ public class HoldingsController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("message", "Image import is not configured on this server"));
         }
+        uploadValidator.validate(file, UploadValidator.Kind.IMAGE);
         try {
             List<HoldingRequest> extracted = statementScanService.extractHoldings(file);
             return ResponseEntity.ok(holdingImportService.importRequests(extracted));
