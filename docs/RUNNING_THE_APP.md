@@ -2,7 +2,7 @@
 
 How to start the application — on your own machine and on a VM — and how to show it working.
 
-`docs/DEPLOYMENT.md` covers the full production pipeline and Jenkins. This document is the
+`DEPLOYMENT.md` covers the full production pipeline and Jenkins. This document is the
 shorter path: get it running, prove it is running, walk someone through it.
 
 ---
@@ -11,7 +11,8 @@ shorter path: get it running, prove it is running, walk someone through it.
 
 | | Local (from source) | VM (Docker) |
 |---|---|---|
-| Start | `mvn spring-boot:run` + `npm run dev` | `docker compose -f docker-compose.prod.yml up -d` |
+| Start | `mvn spring-boot:run` + `npm run dev` | `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d` |
+| Secrets from | `backend/.env`, or the shell | `.env.prod` |
 | Open at | `http://localhost:5173` | `http://<vm-ip>:8090` |
 | Database | H2, in memory | MySQL container, persisted |
 | Data on restart | Reseeded | Kept |
@@ -62,26 +63,36 @@ Three features call a language model: **portfolio summaries**, **Excel / smart f
 everything else works normally.
 
 You only need an API key. Get a free one at
-[console.groq.com/keys](https://console.groq.com/keys), then:
+[console.groq.com/keys](https://console.groq.com/keys).
+
+**The simplest way — a `.env` file.** Create `backend/.env`:
+
+```bash
+INSIGHTS_API_KEY=gsk_your_key_here
+```
+
+Then start the backend normally; it is picked up automatically:
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+`backend/.env` is gitignored, so the key stays off the repository. The same file can hold
+`JWT_SECRET`, `OWNER_USERNAME`, `OWNER_PASSWORD` and anything else, which saves re-exporting them
+in every new terminal.
+
+**Or set it in the shell**, which overrides the file — handy for trying a different key or model
+without editing anything:
 
 ```bash
 # macOS / Linux
-cd backend
 INSIGHTS_API_KEY=gsk_your_key_here mvn spring-boot:run
 ```
 
 ```powershell
 # Windows PowerShell
-cd backend
-$env:INSIGHTS_API_KEY = "gsk_your_key_here"
-mvn spring-boot:run
-```
-
-```cmd
-:: Windows cmd
-cd backend
-set INSIGHTS_API_KEY=gsk_your_key_here
-mvn spring-boot:run
+$env:INSIGHTS_API_KEY = "gsk_your_key_here"; mvn spring-boot:run
 ```
 
 Confirm it took effect — the backend says so in its first few lines of output:
@@ -99,8 +110,9 @@ AI features disabled - INSIGHTS_API_KEY not set. ...
 then the variable did not reach the process. See
 [If the AI features say "not configured"](#if-the-ai-features-say-not-configured).
 
-> **`.env` does not work here.** Docker Compose reads `.env`; `mvn spring-boot:run` does not.
-> On a local run the variable has to be in the shell that starts Maven.
+> **Two notes on `.env` format.** It is read as a Java properties file, so a backslash in a value
+> is an escape character — write `\` if a password needs one. And `export VAR=value` lines are
+> not understood; use plain `VAR=value`.
 
 Other optional settings, all with working defaults:
 
@@ -186,6 +198,18 @@ INSIGHTS_API_KEY=<optional, for the AI features>
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
+
+> Use `--env-file .env.prod` explicitly. Docker Compose auto-loads `.env`, but it does **not**
+> automatically switch to `.env.prod` just because you are using `docker-compose.prod.yml`.
+> If you run only:
+>
+> ```bash
+> docker compose -f docker-compose.prod.yml up -d
+> ```
+>
+> then variables such as `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `JWT_SECRET`,
+> `DB_ENCRYPTION_KEY`, and `OWNER_PASSWORD` will be missing unless they already exist in the
+> shell environment.
 
 First build takes a few minutes. Then:
 
@@ -360,17 +384,51 @@ Work through these in order:
    AI features disabled - INSIGHTS_API_KEY not set. ...
    ```
 
-4. **Using `.env`?** That only works for Docker Compose. `mvn spring-boot:run` does not read it.
+4. **Using `backend/.env`?** It is read automatically. Check the file is at `backend/.env` (not
+   the repo root), the line reads `INSIGHTS_API_KEY=gsk_...` with no `export` prefix and no
+   quotes, and that no *shell* variable of the same name is overriding it — the shell wins.
 
 5. **On Docker?** The variable has to be in `.env.prod` *and* the stack recreated:
    ```bash
-   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+  docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
    ```
 
 6. **Getting a 502 instead?** Then the key *is* configured and the provider rejected the call —
-   usually an invalid or expired key, or no remaining quota. The exact reason is in the backend
-   log; it is deliberately not returned to the browser, because provider errors can quote your
-   endpoint and account details.
+  usually an invalid or expired key, or no remaining quota. The exact reason is in the backend
+  log; it is deliberately not returned to the browser, because provider errors can quote your
+  endpoint and account details.
+
+### Docker Compose says required variables are missing
+
+If you see errors like:
+
+```text
+required variable DB_ENCRYPTION_KEY is missing a value
+required variable DB_PASSWORD is missing a value
+required variable JWT_SECRET is missing a value
+```
+
+that means Compose did not receive your production environment variables.
+
+Fix it in this order:
+
+1. Create the env file if it does not exist:
+   ```bash
+   cp .env.prod.example .env.prod
+   ```
+2. Fill in the required values in `.env.prod`:
+   - `DB_PASSWORD`
+   - `DB_ROOT_PASSWORD`
+   - `JWT_SECRET`
+   - `DB_ENCRYPTION_KEY`
+   - `OWNER_PASSWORD`
+3. Start the stack with the env file explicitly:
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+   ```
+
+The key point is that `docker-compose.prod.yml` does not imply `.env.prod`; the env file must be
+named on the command line unless you export the variables another way.
 
 > Historical note: before this was fixed, `INSIGHTS_API_URL` had no default outside Docker, so a
 > local run reported "not configured" even with a valid key set. Setting the key alone is now
@@ -455,8 +513,8 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 
 ## Related
 
-- `docs/DEPLOYMENT.md` — the full pipeline, Jenkins, and EC2 setup
-- `docs/TESTING.md` — running the test suites
+- `DEPLOYMENT.md` — the full pipeline, Jenkins, and EC2 setup
+- `TESTING.md` — running the test suites
 - `SECURITY.md` — every configuration flag and what it protects
-- `logs/README.md` — reading the logs and the audit trail
-- `docs/delivery-board.html` — every capability in the system, in one board
+- `LOGGING.md` — reading the logs and the audit trail
+- `delivery-board.html` — every capability in the system, in one board

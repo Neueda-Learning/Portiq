@@ -231,7 +231,7 @@ Tests: `UploadValidatorTest`
   `logs/run/` with commit, branch and exit-code metadata.
 
 **Evidence:** `SecurityAuditLogger.java`, `logback-spring.xml`, `scripts/run-with-logs.sh` ·
-Documentation: `logs/README.md`
+Documentation: `LOGGING.md`
 
 ---
 
@@ -295,5 +295,5 @@ scripts/run-with-logs.sh all
 ## Related documentation
 
 - `SECURITY.md` — control design, configuration reference and operational guidance
-- `logs/README.md` — log locations, retention and how to read the audit trail
-- `docs/DEPLOYMENT.md` — deployment procedure and required environment variables
+- `LOGGING.md` — log locations, retention and how to read the audit trail
+- `DEPLOYMENT.md` — deployment procedure and required environment variables

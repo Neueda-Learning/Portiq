@@ -127,6 +127,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <systemPropertyVariables>
+                        <!--
+                          Neutralise the backend/.env import for tests.
+
+                          application.properties imports that file so a local run picks up secrets
+                          without exporting them. Tests must not: the file is untracked and differs
+                          per machine, so leaving it active means a suite that passes for one
+                          developer and fails for another with no visible cause. A system property
+                          outranks application.properties, and pointing it at a classpath resource
+                          that does not exist makes the import a no-op.
+                        -->
+                        <spring.config.import>optional:classpath:no-dotenv-in-tests.properties</spring.config.import>
+                    </systemPropertyVariables>
                     <argLine>
                         -XX:+EnableDynamicAgentLoading
                         --add-opens java.base/java.lang=ALL-UNNAMED
