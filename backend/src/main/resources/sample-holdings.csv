@@ -1,0 +1,4 @@
+ticker,name,type,quantity,purchasePrice,purchaseDate
+RELIANCE.NS,Reliance Industries Ltd.,STOCK,10,2500.00,2023-01-15
+TCS.NS,Tata Consultancy Services,STOCK,5,3500.00,2023-02-10
+INFY.NS,Infosys Ltd.,STOCK,12,1400.00,2022-11-01
