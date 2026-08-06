@@ -1,6 +1,9 @@
 package com.portiq.service;
 
 import com.portiq.dto.ChatCompletionResponse;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +24,8 @@ import java.util.Map;
 @Component
 public class ChatCompletionClient {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatCompletionClient.class);
+
     @Value("${app.insights.api-key:}")
     private String apiKey;
 
@@ -35,6 +40,39 @@ public class ChatCompletionClient {
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank() && apiUrl != null && !apiUrl.isBlank();
+    }
+
+    /**
+     * Names the environment variable that is missing, or null when the client is ready.
+     *
+     * <p>Exists because "not configured on this server" is a dead end for whoever reads it. Both
+     * halves have to be set, only one is usually forgotten, and the message gave no way to tell
+     * which - so the reader's next move was to go reading source. Naming the variable is not a
+     * disclosure risk: the names are in the public repository, and the value never appears here.
+     */
+    public String missingConfiguration() {
+        boolean noKey = apiKey == null || apiKey.isBlank();
+        boolean noUrl = apiUrl == null || apiUrl.isBlank();
+
+        if (noKey && noUrl) return "INSIGHTS_API_KEY and INSIGHTS_API_URL";
+        if (noKey) return "INSIGHTS_API_KEY";
+        if (noUrl) return "INSIGHTS_API_URL";
+        return null;
+    }
+
+    /**
+     * States at startup whether the AI-backed features are on. Silence about a disabled optional
+     * feature is what let this go unnoticed until someone clicked the button and got a shrug.
+     */
+    @PostConstruct
+    void reportConfiguration() {
+        if (isConfigured()) {
+            log.info("AI features enabled - summaries, smart import and statement scanning are available");
+        } else {
+            log.info("AI features disabled - {} not set. Summaries, smart import and statement "
+                    + "scanning will report that they are unavailable; everything else is unaffected.",
+                    missingConfiguration());
+        }
     }
 
     /**

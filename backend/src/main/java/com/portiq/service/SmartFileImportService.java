@@ -50,6 +50,11 @@ public class SmartFileImportService {
         return chatCompletionClient.isConfigured();
     }
 
+    /** The environment variable that needs setting, or null when the feature is ready. */
+    public String missingConfiguration() {
+        return chatCompletionClient.missingConfiguration();
+    }
+
     public List<HoldingRequest> extractHoldings(MultipartFile file) throws IOException {
         String tableText = textExtractor.extractTableText(file);
         if (tableText.isBlank()) {
