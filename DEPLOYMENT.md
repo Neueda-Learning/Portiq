@@ -12,9 +12,14 @@ browser ──> :8090  frontend (nginx)  ──/api/*──> backend (Spring Boo
                                           all internal; no published port
 ```
 
-Serving the API through nginx on the same origin means the browser issues no
-preflight, so the CORS allow-list in `SecurityConfig` plays no part in a
-deployed stack. It still governs `npm run dev` against a local backend.
+The API is served from the SPA's own origin, so there is no cross-origin call to
+configure. Note that same-origin is *not* by itself enough: browsers attach an
+`Origin` header to every non-GET request even when it is same-origin, and the
+allow-list in `SecurityConfig` is hardcoded to dev and Vercel addresses, so it
+answers 403 `Invalid CORS request` to anything else — GETs succeed while every
+login, create and delete fails. nginx therefore clears `Origin` on proxied
+requests, which is what makes the image work on any host without a rebuild. The
+allow-list still governs `npm run dev` against a local backend.
 
 ## Split of responsibilities
 
