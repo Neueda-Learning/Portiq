@@ -1,10 +1,21 @@
 import { API_BASE_URL, API_ENDPOINTS, TOKEN_STORAGE_KEY } from "../config/api";
-import { apiClient } from "./apiClient";
+import { apiClient, errorFromResponse } from "./apiClient";
 import { getCached, invalidateCache, setCached } from "../utils/cache";
+import { ANALYSIS_CACHE_PREFIX } from "./analysisService";
 
 const HOLDINGS_TTL = 30_000;
 const HISTORY_TTL = 50_000;
 const CACHE_PREFIX = "holdings:";
+
+/**
+ * Risk scores and recommendations are derived from the holdings, so editing a holding invalidates
+ * them too - otherwise a freshly added position would be missing from the risk report for another
+ * five minutes.
+ */
+function invalidateHoldingsAndAnalysis() {
+  invalidateCache(CACHE_PREFIX);
+  invalidateCache(ANALYSIS_CACHE_PREFIX);
+}
 
 function authHeaders() {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -13,22 +24,43 @@ function authHeaders() {
 
 async function handleJson(response) {
   if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
-    try {
-      const body = await response.json();
-      message = body.message || message;
-    } catch (_error) {
-      // Ignore non-JSON bodies.
-    }
-    throw new Error(message);
+    throw await errorFromResponse(response, "Import failed.");
   }
   return response.json();
 }
 
+/**
+ * Multipart upload. Cannot go through apiClient because that sets a JSON content type, so it
+ * repeats the network-failure handling rather than inheriting it.
+ */
+async function uploadFile(endpoint, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData,
+    });
+  } catch (_networkError) {
+    throw new Error(`Could not reach the server at ${API_BASE_URL}. Check that the backend is running.`);
+  }
+
+  return handleJson(response);
+}
+
 async function downloadFile(url, filename) {
-  const response = await fetch(url, { headers: authHeaders() });
+  let response;
+  try {
+    response = await fetch(url, { headers: authHeaders() });
+  } catch (_networkError) {
+    throw new Error(`Could not reach the server at ${API_BASE_URL}. Check that the backend is running.`);
+  }
+
   if (!response.ok) {
-    throw new Error(`Export failed: ${response.status}`);
+    throw await errorFromResponse(response, `Could not export ${filename}.`);
   }
   const blob = await response.blob();
   const link = document.createElement("a");
@@ -52,7 +84,7 @@ export const holdingsService = {
 
   add: async (payload) => {
     const result = await apiClient(API_ENDPOINTS.allHoldings, { method: "POST", body: JSON.stringify(payload) });
-    invalidateCache(CACHE_PREFIX);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
@@ -61,13 +93,13 @@ export const holdingsService = {
       method: "PUT",
       body: JSON.stringify(payload),
     });
-    invalidateCache(CACHE_PREFIX);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
   remove: async (id) => {
     const result = await apiClient(API_ENDPOINTS.holdingByIdFlat(id), { method: "DELETE" });
-    invalidateCache(CACHE_PREFIX);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
@@ -76,7 +108,7 @@ export const holdingsService = {
       method: "POST",
       body: JSON.stringify({ ids }),
     });
-    invalidateCache(CACHE_PREFIX);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
@@ -90,28 +122,14 @@ export const holdingsService = {
   },
 
   importCsv: async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.importCsv}`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: formData,
-    });
-    const result = await handleJson(response);
-    invalidateCache(CACHE_PREFIX);
+    const result = await uploadFile(API_ENDPOINTS.importCsv, file);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
   importImage: async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.importImage}`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: formData,
-    });
-    const result = await handleJson(response);
-    invalidateCache(CACHE_PREFIX);
+    const result = await uploadFile(API_ENDPOINTS.importImage, file);
+    invalidateHoldingsAndAnalysis();
     return result;
   },
 
