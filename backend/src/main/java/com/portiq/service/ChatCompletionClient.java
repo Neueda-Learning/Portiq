@@ -1,5 +1,6 @@
 package com.portiq.service;
 
+import com.portiq.dto.ChatCompletionResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -56,7 +57,6 @@ public class ChatCompletionClient {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public String complete(String model, List<Map<String, Object>> messages) {
         if (!isConfigured()) {
             throw new IllegalStateException(
@@ -74,23 +74,26 @@ public class ChatCompletionClient {
         body.put("temperature", 0.3);
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, entity, Map.class);
 
-        Map<String, Object> responseBody = response.getBody();
+        // Bound to a record rather than a raw Map: the endpoint is configurable per deployment, so
+        // the response can come from a self-hosted gateway or a proxy that wraps errors in its own
+        // envelope. Jackson checks the shape once, here, instead of a ClassCastException surfacing
+        // from the middle of the parsing below.
+        ResponseEntity<ChatCompletionResponse> response =
+                restTemplate.postForEntity(apiUrl, entity, ChatCompletionResponse.class);
+
+        ChatCompletionResponse responseBody = response.getBody();
         if (responseBody == null) {
-            throw new IllegalStateException("Empty response from the summary service");
+            throw new IllegalStateException("Empty response from the model service");
         }
 
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
-        if (choices == null || choices.isEmpty()) {
-            throw new IllegalStateException("The summary service returned no choices");
+        String content = responseBody.firstContent();
+        if (content == null || content.isBlank()) {
+            // One message for all three shapes of "no usable text": no choices, no message, or a
+            // null content because the model stopped on a filter or returned a tool call. The
+            // distinction changes nothing for any caller - each falls back the same way.
+            throw new IllegalStateException("The model service returned no usable content");
         }
-
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        Object content = message.get("content");
-        if (content == null) {
-            throw new IllegalStateException("The summary service returned an empty message");
-        }
-        return content.toString();
+        return content;
     }
 }

@@ -167,27 +167,16 @@ public class HoldingImportService {
      * {@code Row 7: Character array is missing "exponent" mark} - a message about BigDecimal's
      * internals that tells the person holding the spreadsheet nothing about which cell to fix.
      *
-     * <p>The tolerated formats are the ones real broker exports actually contain: thousands
-     * separators, a currency symbol, and parenthesised negatives. Stripping them here is not
-     * laxness - the alternative is a user hand-editing a 400-row export to remove commas.
+     * <p>Which formats are tolerated lives in {@link NumericCellParser}, shared with the
+     * model-output parser so a file accepted by one import path is accepted by the other.
      */
     private BigDecimal parseNumber(String cell, String columnName) {
         String raw = cell == null ? "" : cell.trim();
         if (raw.isEmpty()) {
             throw new InvalidRequestException(columnName + " is empty.");
         }
-
-        boolean parenthesisedNegative = raw.startsWith("(") && raw.endsWith(")");
-        String cleaned = raw.replaceAll("[,\\s ]", "")
-                .replaceAll("^[(]|[)]$", "")
-                .replaceAll("^[\\p{Sc}]", "");
-
-        try {
-            BigDecimal value = new BigDecimal(cleaned);
-            return parenthesisedNegative ? value.negate() : value;
-        } catch (NumberFormatException e) {
-            throw new InvalidRequestException(columnName + " '" + raw + "' is not a number.");
-        }
+        return NumericCellParser.parse(raw).orElseThrow(() ->
+                new InvalidRequestException(columnName + " '" + raw + "' is not a number."));
     }
 
     /** Reads the optional date cell, defaulting to today and naming the column when it is wrong. */
