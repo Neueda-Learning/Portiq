@@ -36,6 +36,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Revoke server-side first, so the token is dead even if a copy was captured. The local
+    // clear-down runs regardless of the outcome: if the call fails - offline, or the token had
+    // already expired - the user still expects to be logged out of this browser.
+    authService.logout().catch(() => {});
+
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUsername(null);

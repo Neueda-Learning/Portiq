@@ -17,6 +17,7 @@ export const API_ENDPOINTS = {
   holdingById: (portfolioId, holdingId) => `/api/portfolios/${portfolioId}/holdings/${holdingId}`,
 
   login: "/api/auth/login",
+  logout: "/api/auth/logout",
   me: "/api/auth/me",
   webauthnRegistrationOptions: "/api/auth/webauthn/registration/options",
   webauthnRegistrationVerify: "/api/auth/webauthn/registration/verify",
