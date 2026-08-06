@@ -32,17 +32,55 @@ Actions never deploys. Jenkins never gates a pull request.
 Get this working before adding Jenkins. If it fails here it will fail there too,
 with more moving parts in the way.
 
-**1. Install Docker** (Ubuntu / WSL):
+**1. Install Docker and the Compose plugin.**
+
+Amazon Linux 2023 (EC2):
+
+```bash
+sudo dnf install -y docker git
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
+newgrp docker
+```
+
+AL2023's `docker` package does **not** include Compose v2, and this project needs
+it — `docker compose` (plugin), not the old `docker-compose` script. Check, and
+install it if missing:
+
+```bash
+docker compose version   # if this errors, run the block below
+```
+
+```bash
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -SL \
+  https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+docker compose version   # must now print v2.x
+```
+
+Ubuntu / Debian / WSL:
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"
-newgrp docker          # or log out and back in
-docker compose version # must print v2.x
+newgrp docker
+docker compose version
 ```
 
-On WSL you can instead enable Docker Desktop's WSL integration
-(Settings → Resources → WSL Integration) and skip the install.
+**Memory.** Building the backend image runs Maven inside the container, which
+wants roughly 2GB. On a 1GB instance (`t2.micro`, `t3.micro`) it will be killed
+mid-build. Check with `free -h`; if you have under 2GB, add swap once:
+
+```bash
+sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+You do not need Maven, Java or Node on the host for the application — every
+build happens inside a container. Jenkins needs Java 17, covered below.
 
 **2. Configure:**
 
@@ -87,7 +125,18 @@ docker compose -f docker-compose.prod.yml down -v     # stop and delete the data
 
 ## Part 2 — Jenkins
 
-**1. Install** (Ubuntu / WSL, Jenkins needs Java 17+):
+**1. Install** (Jenkins needs Java 17+).
+
+Amazon Linux 2023:
+
+```bash
+sudo dnf install -y java-17-amazon-corretto
+sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+sudo dnf install -y jenkins
+```
+
+Ubuntu / Debian:
 
 ```bash
 sudo apt update && sudo apt install -y openjdk-17-jre
@@ -97,6 +146,17 @@ echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
   https://pkg.jenkins.io/debian-stable binary/" \
   | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
 sudo apt update && sudo apt install -y jenkins
+```
+
+**Move Jenkins off port 8080 before starting it** — that is the app's port:
+
+```bash
+sudo mkdir -p /etc/systemd/system/jenkins.service.d
+sudo tee /etc/systemd/system/jenkins.service.d/override.conf > /dev/null <<'EOF'
+[Service]
+Environment="JENKINS_PORT=8081"
+EOF
+sudo systemctl daemon-reload
 sudo systemctl enable --now jenkins
 ```
 
@@ -129,10 +189,31 @@ sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 Install suggested plugins, then add **Pipeline**, **Git**, and
 **Docker Pipeline** if they are not already present.
 
-> Port note: Jenkins defaults to 8080, which collides with the app. The commands
-> above use 8081 for Jenkins. To change it permanently, set `HTTP_PORT=8081` in
-> `/etc/default/jenkins`, or set `APP_PORT` to something else in `.env.prod` and
-> in the `Jenkinsfile` environment block.
+## Running on EC2
+
+Two extra things apply when the host is an EC2 instance.
+
+**Security group.** Nothing is reachable until you open the ports. Edit the
+instance's inbound rules to allow, ideally sourced to your own IP rather than
+`0.0.0.0/0`:
+
+| Port | For |
+|---|---|
+| 8080 | the application |
+| 8081 | the Jenkins UI |
+
+**Origin.** Set `WEBAUTHN_ORIGIN` in `.env.prod` to the URL you actually type,
+for example `http://<public-ip>:8080`, and `WEBAUTHN_RP_ID` to the bare host.
+Note that biometric login will still not work over plain HTTP to a public IP —
+WebAuthn requires a secure context, which only `localhost` and HTTPS satisfy.
+Password login is unaffected. To demo biometrics, either use an SSH tunnel so
+the browser sees `localhost`:
+
+```bash
+ssh -L 8080:localhost:8080 ec2-user@<public-ip>
+```
+
+or put the app behind HTTPS with a real domain.
 
 **4. Add credentials.** Manage Jenkins → Credentials → System → Global →
 Add Credentials. Each is kind **Secret text**, and the ID must match exactly:
