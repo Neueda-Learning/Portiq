@@ -2023,3 +2023,31 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Error boundary fallback. Deliberately plain: it has to render correctly even when whatever
+   broke is a styling or data problem, so it depends on nothing beyond these rules. */
+.error-boundary {
+  max-width: 640px;
+  margin: 4rem auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-boundary h1 {
+  font-size: 1.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.error-boundary-detail {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  text-align: left;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 16rem;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.12);
+}

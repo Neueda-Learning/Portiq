@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -67,6 +68,7 @@ public class SecurityConfig {
     private final RateLimiter rateLimiter;
     private final ClientIpResolver clientIpResolver;
     private final SecurityAuditLogger audit;
+    private final Environment environment;
 
     /**
      * Origins allowed to call this API from a browser. Deliberately an explicit list with no
@@ -93,12 +95,14 @@ public class SecurityConfig {
                           JsonAuthenticationEntryPoint authenticationEntryPoint,
                           RateLimiter rateLimiter,
                           ClientIpResolver clientIpResolver,
-                          SecurityAuditLogger audit) {
+                          SecurityAuditLogger audit,
+                          Environment environment) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.rateLimiter = rateLimiter;
         this.clientIpResolver = clientIpResolver;
         this.audit = audit;
+        this.environment = environment;
     }
 
     @Bean
@@ -149,7 +153,10 @@ public class SecurityConfig {
                     if (docsPublic) {
                         auth.requestMatchers(DOCS_PATHS).permitAll();
                     }
-                    if (h2ConsoleEnabled) {
+                    // Two independent conditions, both of which must hold. The property alone was
+                    // not enough: a permitAll rule for a SQL shell is the kind of thing that
+                    // survives a config change nobody re-reads, so the profile has to agree too.
+                    if (h2ConsoleEnabled && !productionProfileActive()) {
                         auth.requestMatchers("/h2-console/**").permitAll();
                     }
 
@@ -165,6 +172,17 @@ public class SecurityConfig {
 
     private RateLimitFilter rateLimitFilter() {
         return new RateLimitFilter(rateLimiter, clientIpResolver, audit, rateLimitEnabled);
+    }
+
+    /** True when a profile that represents a real deployment is active. */
+    private boolean productionProfileActive() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)
+                    || "supabase".equalsIgnoreCase(profile)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private RequestMatcher docsMatcher() {
