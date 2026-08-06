@@ -16,6 +16,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -78,6 +79,10 @@ public class HoldingImportService {
                         List.of("That file has " + rows.size() + " rows. The limit is " + MAX_ROWS + "."));
             }
 
+            // Rows are parsed and validated first, then imported as one batch. Doing it row by row
+            // meant a full table read per row; more importantly, a row that failed halfway through
+            // left the earlier rows already committed, so a retry double-counted them.
+            List<HoldingRequest> parsed = new ArrayList<>();
             int start = looksLikeHeader(rows.get(0)) ? 1 : 0;
             for (int i = start; i < rows.size(); i++) {
                 String[] row = rows.get(i);
@@ -87,11 +92,15 @@ public class HoldingImportService {
                 try {
                     HoldingRequest request = parseRow(row);
                     validate(request);
-                    holdingService.mergeOrCreate(portfolio, request);
-                    imported++;
-                } catch (Exception e) {
+                    parsed.add(request);
+                } catch (InvalidRequestException e) {
                     errors.add("Row " + (i + 1) + ": " + e.getMessage());
                 }
+            }
+
+            if (!parsed.isEmpty()) {
+                holdingService.mergeAll(portfolio, parsed);
+                imported = parsed.size();
             }
         } catch (Exception e) {
             errors.add("Could not read CSV file: " + e.getMessage());
@@ -110,14 +119,19 @@ public class HoldingImportService {
         List<String> errors = new ArrayList<>();
         int imported = 0;
 
+        List<HoldingRequest> valid = new ArrayList<>();
         for (HoldingRequest request : requests) {
             try {
                 validate(request);
-                holdingService.mergeOrCreate(portfolio, request);
-                imported++;
-            } catch (Exception e) {
+                valid.add(request);
+            } catch (InvalidRequestException e) {
                 errors.add(request.getTicker() + ": " + e.getMessage());
             }
+        }
+
+        if (!valid.isEmpty()) {
+            holdingService.mergeAll(portfolio, valid);
+            imported = valid.size();
         }
         return new HoldingImportResult(imported, errors);
     }
@@ -140,9 +154,53 @@ public class HoldingImportService {
             }
         }
         request.setType(type);
-        request.setQuantity(new BigDecimal(row[3].trim()));
-        request.setPurchasePrice(new BigDecimal(row[4].trim()));
-        request.setPurchaseDate(row.length > 5 && !row[5].isBlank() ? LocalDate.parse(row[5].trim()) : LocalDate.now());
+        request.setQuantity(parseNumber(row[3], "Quantity"));
+        request.setPurchasePrice(parseNumber(row[4], "Purchase price"));
+        request.setPurchaseDate(parseDate(row.length > 5 ? row[5] : null));
         return request;
+    }
+
+    /**
+     * Reads a numeric cell, saying which column was wrong and what was in it.
+     *
+     * <p>A bare {@code new BigDecimal(cell)} surfaced as
+     * {@code Row 7: Character array is missing "exponent" mark} - a message about BigDecimal's
+     * internals that tells the person holding the spreadsheet nothing about which cell to fix.
+     *
+     * <p>The tolerated formats are the ones real broker exports actually contain: thousands
+     * separators, a currency symbol, and parenthesised negatives. Stripping them here is not
+     * laxness - the alternative is a user hand-editing a 400-row export to remove commas.
+     */
+    private BigDecimal parseNumber(String cell, String columnName) {
+        String raw = cell == null ? "" : cell.trim();
+        if (raw.isEmpty()) {
+            throw new InvalidRequestException(columnName + " is empty.");
+        }
+
+        boolean parenthesisedNegative = raw.startsWith("(") && raw.endsWith(")");
+        String cleaned = raw.replaceAll("[,\\s ]", "")
+                .replaceAll("^[(]|[)]$", "")
+                .replaceAll("^[\\p{Sc}]", "");
+
+        try {
+            BigDecimal value = new BigDecimal(cleaned);
+            return parenthesisedNegative ? value.negate() : value;
+        } catch (NumberFormatException e) {
+            throw new InvalidRequestException(columnName + " '" + raw + "' is not a number.");
+        }
+    }
+
+    /** Reads the optional date cell, defaulting to today and naming the column when it is wrong. */
+    private LocalDate parseDate(String cell) {
+        String raw = cell == null ? "" : cell.trim();
+        if (raw.isEmpty()) {
+            return LocalDate.now();
+        }
+        try {
+            return LocalDate.parse(raw);
+        } catch (DateTimeParseException e) {
+            throw new InvalidRequestException(
+                    "Purchase date '" + raw + "' is not a date. Use the YYYY-MM-DD format.");
+        }
     }
 }

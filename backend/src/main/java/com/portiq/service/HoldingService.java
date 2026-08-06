@@ -12,7 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -102,26 +105,67 @@ public class HoldingService {
      * which portfolio it lives in, since the app presents one flat "all holdings" view - instead
      * of creating a duplicate row. Only a genuinely new ticker is created under the given
      * (default) portfolio.
+     *
+     * <p>The match is made in memory rather than with a {@code findByTicker} query, and that is
+     * forced by the schema rather than chosen: {@code Holding.ticker} is encrypted with a random
+     * IV per value, so two rows holding "TCS.NS" have different ciphertext and no {@code WHERE
+     * ticker = ?} could ever match. Any query-based version of this would silently find nothing
+     * and duplicate every position on the second import.
      */
     public Holding mergeOrCreate(Portfolio portfolio, HoldingRequest request) {
-        String ticker = request.getTicker().toUpperCase();
-        List<Holding> existing = holdingRepository.findAll();
+        return mergeAll(portfolio, List.of(request)).get(0);
+    }
 
-        return existing.stream()
-                .filter(h -> h.getTicker().equalsIgnoreCase(ticker))
-                .findFirst()
-                .map(holding -> {
-                    BigDecimal totalQuantity = holding.getQuantity().add(request.getQuantity());
-                    BigDecimal existingCost = holding.getQuantity().multiply(holding.getPurchasePrice());
-                    BigDecimal addedCost = request.getQuantity().multiply(request.getPurchasePrice());
-                    BigDecimal weightedAvgPrice = existingCost.add(addedCost)
-                            .divide(totalQuantity, 4, RoundingMode.HALF_UP);
+    /**
+     * Merges a batch of requests in one pass.
+     *
+     * <p>The single-row path above used to be called in a loop by the importers, and each call
+     * re-read every holding in the database. A 500-row broker export therefore performed 500 full
+     * table loads and 500 individual saves - and because each load decrypts every field of every
+     * row, the cost was not just I/O but a few hundred thousand AES operations for an import that
+     * needs one read.
+     *
+     * <p>Here the table is read once into a ticker-keyed map, every request is folded into it, and
+     * the result is written with a single {@code saveAll}. Requests that share a ticker with each
+     * other merge together correctly too, which the per-row version only achieved by writing and
+     * re-reading between rows.
+     */
+    public List<Holding> mergeAll(Portfolio portfolio, List<HoldingRequest> requests) {
+        Map<String, Holding> byTicker = new HashMap<>();
+        for (Holding holding : holdingRepository.findAll()) {
+            byTicker.putIfAbsent(holding.getTicker().toUpperCase(), holding);
+        }
 
-                    holding.setQuantity(totalQuantity);
-                    holding.setPurchasePrice(weightedAvgPrice);
-                    return holdingRepository.save(holding);
-                })
-                .orElseGet(() -> holdingRepository.save(toEntity(request, portfolio)));
+        List<Holding> touched = new ArrayList<>(requests.size());
+        for (HoldingRequest request : requests) {
+            String ticker = request.getTicker().toUpperCase();
+            Holding existing = byTicker.get(ticker);
+
+            if (existing == null) {
+                Holding created = toEntity(request, portfolio);
+                byTicker.put(ticker, created);
+                touched.add(created);
+            } else {
+                merge(existing, request);
+                if (!touched.contains(existing)) {
+                    touched.add(existing);
+                }
+            }
+        }
+
+        return holdingRepository.saveAll(touched);
+    }
+
+    /** Folds a request into an existing position at weighted-average cost. */
+    private void merge(Holding holding, HoldingRequest request) {
+        BigDecimal totalQuantity = holding.getQuantity().add(request.getQuantity());
+        BigDecimal existingCost = holding.getQuantity().multiply(holding.getPurchasePrice());
+        BigDecimal addedCost = request.getQuantity().multiply(request.getPurchasePrice());
+        BigDecimal weightedAvgPrice = existingCost.add(addedCost)
+                .divide(totalQuantity, 4, RoundingMode.HALF_UP);
+
+        holding.setQuantity(totalQuantity);
+        holding.setPurchasePrice(weightedAvgPrice);
     }
 
     @Transactional(readOnly = true)
