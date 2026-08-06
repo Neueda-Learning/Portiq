@@ -15,6 +15,7 @@ import MobileAccountPage from "./pages/mobile/MobileAccountPage";
 import MobileInsightsPage from "./pages/mobile/MobileInsightsPage";
 import { useAuth } from "./context/AuthContext";
 import { useIsMobile } from "./utils/useIsMobile";
+import { useGlobalHapticFeedback } from "./utils/haptics";
 
 const SIDEBAR_STORAGE_KEY = "portiq_sidebar_collapsed";
 
@@ -23,6 +24,12 @@ function App() {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // One document-level listener covers every interactive control in the app, so
+  // individual components need no touch handlers. Gated on mobile because the
+  // Vibration API is meaningless on desktop; it also no-ops on its own wherever
+  // it is unsupported, so this is belt and braces.
+  useGlobalHapticFeedback(isMobile);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));

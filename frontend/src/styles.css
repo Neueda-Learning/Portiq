@@ -543,6 +543,69 @@ h4 {
   100% { background-position: 0 50%; }
 }
 
+/* Loading indicator. Skeletons are preferred where the shape of the incoming
+   content is known; this is for the cases where it is not - a route-level auth
+   check, or a small inline spot next to a heading. */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  padding: 32px 16px;
+}
+
+.loading-inline {
+  display: inline-flex;
+  padding: 0;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.loading-spinner {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: loading-spin 0.7s linear infinite;
+}
+
+.loading-sm .loading-spinner { width: 14px; height: 14px; border-width: 2px; }
+.loading-lg .loading-spinner { width: 28px; height: 28px; border-width: 3px; }
+
+.loading-label {
+  font-size: 14px;
+}
+
+.loading-sm .loading-label { font-size: 13px; }
+.loading-lg .loading-label { font-size: 15px; }
+
+.loading-fullscreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 40;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Respect a reduced-motion preference: keep the indicator visible, drop the
+   spin. The label still announces via aria-live, so nothing is lost. */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-top-color: var(--primary);
+    opacity: 0.7;
+  }
+}
+
 .modal {
   position: fixed;
   inset: 0;
