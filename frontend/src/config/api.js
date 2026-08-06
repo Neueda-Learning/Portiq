@@ -1,4 +1,11 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4001";
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
+
+// An explicitly empty value means "same origin", which is how the container
+// image is built - nginx proxies /api through to the backend. Only fall back to
+// the local dev server when the variable was not supplied at all, otherwise an
+// empty string would silently point a deployed build at localhost:4001.
+export const API_BASE_URL =
+  configuredBaseUrl === undefined ? "http://localhost:4001" : configuredBaseUrl;
 
 export const TOKEN_STORAGE_KEY = "portiq_token";
 

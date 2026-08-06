@@ -27,7 +27,12 @@ Backend (http://localhost:4001)
 
 ```text
 portiq/
-  docker-compose.yml        # local MySQL
+  docker-compose.yml        # local MySQL only, for running the backend from your IDE
+  docker-compose.prod.yml   # full stack: mysql + backend + frontend
+  .env.prod.example         # template for the deployed stack
+  Jenkinsfile               # CD pipeline (build images, deploy, smoke test)
+  DEPLOYMENT.md
+  .github/workflows/        # CI: tests, builds, image builds
   backend/
     pom.xml
     .env.example
@@ -47,6 +52,8 @@ portiq/
       sample-holdings.csv
   frontend/
     .env.example
+    Dockerfile              # vite build -> nginx
+    nginx.conf              # SPA fallback + /api proxy to the backend
     index.html
     vite.config.js
     src/
@@ -91,6 +98,23 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=prod"
 ```
 
 Generate secrets with `openssl rand -base64 48` (JWT) and `openssl rand -base64 32` (encryption key). Keep `DB_ENCRYPTION_KEY` stable once you have real data - rotating it makes previously stored data unreadable.
+
+## Deployment
+
+The whole stack runs as three containers on a Linux host — nginx serving the
+built SPA and proxying `/api` to Spring Boot, with MySQL behind both:
+
+```bash
+cp .env.prod.example .env.prod    # then fill in the secrets
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+Then open <http://localhost:8080>.
+
+CI and CD are split: **GitHub Actions** runs the backend tests, the frontend
+build and both image builds on every push and pull request; **Jenkins**, running
+on the deployment host, builds the images and rolls out the stack. See
+[DEPLOYMENT.md](DEPLOYMENT.md) for the Jenkins setup and troubleshooting.
 
 ## Portfolio Summary and Statement Image Import (optional)
 

@@ -1,4 +1,5 @@
-name: Backend CI/CD
+# Continuous integration only. Deployment is Jenkins' job - see Jenkinsfile.
+name: Backend CI
 
 on:
   push:
@@ -50,11 +51,15 @@ jobs:
           path: backend/target/*.jar
           retention-days: 7
 
-  deploy:
-    name: Deploy to Render
+  docker:
+    name: Verify image builds
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Render deploy hook
-        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Jenkins builds this same image to deploy. Building it here too means a
+      # broken Dockerfile fails the PR rather than the deploy.
+      - name: Build backend image
+        run: docker build -t portiq-backend:ci ./backend
