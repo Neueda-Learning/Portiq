@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test logging: console only.
+
+  Logback prefers this file over logback-spring.xml whenever it is on the classpath, which it only
+  is during tests. That is the whole mechanism - and it is used here because the obvious-looking
+  alternative does not work: a <springProfile name="test"> block inside logback-spring.xml never
+  activates, because Spring Boot does not switch on a "test" profile of its own accord. @SpringBootTest
+  runs with whatever profiles are active in production configuration, so the file appenders stayed on
+  and every `mvn test` wrote real log files into backend/logs/.
+
+  That mattered for more than tidiness. Those files record deliberately-provoked failures - the
+  rejected logins and blocked requests the security tests exist to trigger - so a security log full
+  of test noise is one nobody can trust when reading it for real events.
+-->
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Named SECURITY so the audit logger still resolves; it just goes to the console here. -->
+    <logger name="SECURITY" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

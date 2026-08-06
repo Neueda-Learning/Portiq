@@ -31,6 +31,11 @@ frontend/npm-install.log
 Thumbs.db
 
 # Logs. The directory structure is tracked (logs/README.md, logs/.gitkeep); the logs are not.
-logs/*
-!logs/README.md
-!logs/.gitkeep
+/logs/*
+!/logs/README.md
+!/logs/.gitkeep
+
+# A log directory anywhere else is one the app created from a different working directory
+# (running from backend/ resolves the relative LOG_DIR against backend/). Never committable.
+logs/
+*.log
