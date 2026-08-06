@@ -25,7 +25,13 @@ public class CacheConfig {
         manager.setCaches(List.of(
                 buildCache("prices", 60, TimeUnit.SECONDS, 1000),
                 buildCache("news", 10, TimeUnit.MINUTES, 200),
-                buildCache("priceHistory", 5, TimeUnit.MINUTES, 500)
+                buildCache("priceHistory", 5, TimeUnit.MINUTES, 500),
+                // A year of daily closes barely moves intraday, and the risk/recommendation
+                // engines pull one series per holding plus the whole idea universe - so this is
+                // the cache that keeps those endpoints responsive. Only the external fetch is
+                // cached; the reports themselves are recomputed per request so they never go
+                // stale behind a holdings edit.
+                buildCache("dailySeries", 30, TimeUnit.MINUTES, 500)
         ));
         return manager;
     }
