@@ -7,9 +7,12 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import HoldingsPage from "./pages/HoldingsPage";
 import LoginPage from "./pages/LoginPage";
+import RecommendationsPage from "./pages/RecommendationsPage";
+import RiskPage from "./pages/RiskPage";
 import MobileDashboardPage from "./pages/mobile/MobileDashboardPage";
 import MobileHoldingsPage from "./pages/mobile/MobileHoldingsPage";
 import MobileAccountPage from "./pages/mobile/MobileAccountPage";
+import MobileInsightsPage from "./pages/mobile/MobileInsightsPage";
 import { useAuth } from "./context/AuthContext";
 import { useIsMobile } from "./utils/useIsMobile";
 
@@ -42,6 +45,14 @@ function App() {
           element={
             <ProtectedRoute>
               <MobileHoldingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/insights"
+          element={
+            <ProtectedRoute>
+              <MobileInsightsPage />
             </ProtectedRoute>
           }
         />
@@ -94,6 +105,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <HoldingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recommendations"
+              element={
+                <ProtectedRoute>
+                  <RecommendationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/risk"
+              element={
+                <ProtectedRoute>
+                  <RiskPage />
                 </ProtectedRoute>
               }
             />
