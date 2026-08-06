@@ -117,14 +117,10 @@
     </root>
 
     <!--
-      Tests write to the console only. Otherwise every `mvn test` run would litter logs/ with
-      files describing deliberately-provoked failures, which is noise that makes the real log
-      harder to trust.
+      Tests write to the console only, and that is arranged by src/test/resources/logback-test.xml
+      rather than a <springProfile name="test"> block here. The block would never fire: Spring Boot
+      does not activate a "test" profile of its own accord, so @SpringBootTest ran with these file
+      appenders live and every `mvn test` wrote real log files into backend/logs/.
     -->
-    <springProfile name="test">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-        </root>
-    </springProfile>
 
 </configuration>
