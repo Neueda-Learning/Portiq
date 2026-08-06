@@ -212,5 +212,5 @@ Stated plainly, because a testing document that implies total coverage is not us
 ## Related
 
 - `OWASP_TOP_10_COMPLIANCE.md` — which suite proves which security control
-- `docs/BRANCHING_STRATEGY.md` — when tests must pass in the workflow
-- `logs/README.md` — where test output is captured
+- `BRANCHING_STRATEGY.md` — when tests must pass in the workflow
+- `LOGGING.md` — where test output is captured

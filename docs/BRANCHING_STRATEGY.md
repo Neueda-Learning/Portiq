@@ -222,7 +222,7 @@ The CVE scan also runs on a schedule, because a vulnerability is published again
 already have, not against a change you just made. A scan that only runs on push reports it whenever
 someone next happens to touch that directory — which could be weeks.
 
-Jenkins deploys from `main` after merge. See `docs/DEPLOYMENT.md`.
+Jenkins deploys from `main` after merge. See `DEPLOYMENT.md`.
 
 ---
 
@@ -263,6 +263,6 @@ git remote set-head origin main     # fix locally
 
 ## Related
 
-- `docs/TESTING.md` — what must pass before a PR
-- `docs/DEPLOYMENT.md` — how `main` reaches production
+- `TESTING.md` — what must pass before a PR
+- `DEPLOYMENT.md` — how `main` reaches production
 - `SECURITY.md` — controls a change must not regress

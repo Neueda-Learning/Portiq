@@ -31,7 +31,7 @@ portiq/
   docker-compose.prod.yml   # full stack: mysql + backend + frontend
   .env.prod.example         # template for the deployed stack
   Jenkinsfile               # CD pipeline (build images, deploy, smoke test)
-  DEPLOYMENT.md
+  docs/DEPLOYMENT.md
   .github/workflows/        # CI: tests, builds, image builds
   backend/
     pom.xml
@@ -114,7 +114,7 @@ Then open <http://localhost:8090>.
 CI and CD are split: **GitHub Actions** runs the backend tests, the frontend
 build and both image builds on every push and pull request; **Jenkins**, running
 on the deployment host, builds the images and rolls out the stack. See
-[DEPLOYMENT.md](DEPLOYMENT.md) for the Jenkins setup and troubleshooting.
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the Jenkins setup and troubleshooting.
 
 ## Portfolio Summary and Statement Image Import (optional)
 
@@ -141,6 +141,10 @@ cd frontend && npm test     # 25 tests
 ```
 
 See [docs/TESTING.md](docs/TESTING.md) for what is tested and why, conventions, and the known gaps.
+
+## Documentation
+
+All of it is in [docs/](docs/) — start at [docs/README.md](docs/README.md) for the index.
 
 ## Running it
 
@@ -172,14 +176,14 @@ scripts/run-with-logs.sh all          # Linux / macOS / Git Bash
 ```
 
 Each log records the branch, commit and exit code, so an old one is still worth reading.
-See [logs/README.md](logs/README.md) for what goes where, retention, and how to read the audit
+See [docs/LOGGING.md](docs/LOGGING.md) for what goes where, retention, and how to read the audit
 trail.
 
 ## Security
 
-- [OWASP_TOP_10_COMPLIANCE.md](OWASP_TOP_10_COMPLIANCE.md) — category-by-category record of the
+- [docs/OWASP_TOP_10_COMPLIANCE.md](docs/OWASP_TOP_10_COMPLIANCE.md) — category-by-category record of the
   controls, the code that enforces them, and the tests that prove it
-- [SECURITY.md](SECURITY.md) — design rationale, configuration reference and known limitations
+- [docs/SECURITY.md](docs/SECURITY.md) — design rationale, configuration reference and known limitations
 
 Two things to know before deploying:
 

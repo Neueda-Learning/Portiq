@@ -30,9 +30,9 @@ frontend/npm-install.log
 .DS_Store
 Thumbs.db
 
-# Logs. The directory structure is tracked (logs/README.md, logs/.gitkeep); the logs are not.
+# Logs. The directory is tracked via logs/.gitkeep; the logs themselves are not.
+# How to read them is documented in docs/LOGGING.md.
 /logs/*
-!/logs/README.md
 !/logs/.gitkeep
 
 # A log directory anywhere else is one the app created from a different working directory
