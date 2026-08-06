@@ -26,10 +26,34 @@ public class ChatCompletionClient {
     @Value("${app.insights.api-url:}")
     private String apiUrl;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public ChatCompletionClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank() && apiUrl != null && !apiUrl.isBlank();
+    }
+
+    /**
+     * The endpoint is an operator setting, not user input, so it is not run through
+     * {@code OutboundUrlGuard} - a self-hosted model on a private address is a legitimate
+     * configuration, and an allowlist would forbid it. What is checked is the scheme: the API key
+     * travels in an {@code Authorization} header on every call, and over plain http that key is
+     * readable by anything on the path. Loopback is exempt because it never leaves the machine.
+     */
+    private void checkEndpoint() {
+        String url = apiUrl.trim().toLowerCase();
+        boolean localhost = url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1")
+                || url.startsWith("http://[::1]");
+        if (url.startsWith("http://") && !localhost) {
+            throw new IllegalStateException(
+                    "INSIGHTS_API_URL must use https - the API key is sent with every request");
+        }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            throw new IllegalStateException("INSIGHTS_API_URL must be an http(s) URL");
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -38,6 +62,7 @@ public class ChatCompletionClient {
             throw new IllegalStateException(
                     "This feature is not configured. Set INSIGHTS_API_KEY and INSIGHTS_API_URL in the backend environment.");
         }
+        checkEndpoint();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

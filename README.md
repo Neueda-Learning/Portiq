@@ -140,9 +140,21 @@ cd backend
 mvn test
 ```
 
+## Security
+
+See [SECURITY.md](SECURITY.md) for how the app addresses the OWASP Top 10, what each control does,
+and the known limitations. Two things to know before deploying:
+
+- Under the `prod` profile the app **refuses to start** on the development defaults — `JWT_SECRET`,
+  `DB_ENCRYPTION_KEY` and `OWNER_PASSWORD` must be set. It reports every missing one at once.
+- Set `TRUST_PROXY=true` only when a reverse proxy in front overwrites `X-Forwarded-For`. On a
+  directly exposed server it lets a caller forge a new identity per request and bypass rate limiting.
+
+Dependency CVE scan: `cd backend && mvn -Psecurity verify`.
+
 ## API Overview
 
-- `POST /api/auth/login`, `GET /api/auth/me`
+- `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`
 - `POST /api/auth/webauthn/registration/options`, `/registration/verify`
 - `POST /api/auth/webauthn/login/options`, `/login/verify`
 - `GET/POST /api/holdings`, `PUT/DELETE /api/holdings/{id}`
@@ -159,7 +171,13 @@ mvn test
 
 ## Notes
 
-- All endpoints under `/api/**` except `/api/auth/**` require a `Authorization: Bearer <token>` header.
+- All endpoints under `/api/**` require an `Authorization: Bearer <token>` header, except
+  `/api/auth/login` and the WebAuthn login endpoints. `/api/auth/me`, `/api/auth/logout` and
+  biometric *registration* need a token like everything else.
+- `POST /api/auth/logout` revokes the token server-side rather than relying on the client to discard
+  it — a signed token is otherwise valid until it expires.
+- Login is rate limited (20 attempts per 5 minutes per address) and locks out for 15 minutes after 5
+  failures against one account. Blocked callers get a `429` with `Retry-After`.
 - Market prices and the portfolio value chart use Yahoo Finance's public quote/chart endpoints (no API key). News uses free Yahoo Finance and Google News RSS feeds. Both fail gracefully (falling back to purchase price, or an empty list) if unreachable.
 - Recommendations and risk scores also need no API key - they are computed in Java from a year of daily closes. Setting `INSIGHTS_API_KEY` only rewrites the recommendation wording into better prose; the calls themselves are always rule-based, and the endpoints stay on HTTP 200 whether or not a model is configured. Every response carries a `disclaimer` field: this is educational analysis, not investment advice.
 - A ticker the price feed cannot resolve (delisted, renamed) is reported with `dataQuality: UNAVAILABLE` and excluded from the portfolio aggregates rather than silently scored as zero.

@@ -1,5 +1,6 @@
 package com.portiq.service;
 
+import com.portiq.security.OutboundUrlGuard;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -7,8 +8,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriUtils;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +31,13 @@ public class PriceLookupService {
 
     private static final String CHART_API = "https://query1.finance.yahoo.com/v8/finance/chart/";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+    private final OutboundUrlGuard urlGuard;
+
+    public PriceLookupService(RestTemplate restTemplate, OutboundUrlGuard urlGuard) {
+        this.restTemplate = restTemplate;
+        this.urlGuard = urlGuard;
+    }
 
     @Cacheable(value = "prices", key = "#ticker", unless = "#result == null")
     @SuppressWarnings("unchecked")
@@ -37,8 +47,14 @@ public class PriceLookupService {
             headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
             headers.set("Accept", "application/json");
 
+            // Encoded, not concatenated - see MarketDataFetcher for why the ticker cannot be
+            // allowed to leave its path segment.
+            String url = CHART_API + UriUtils.encodePathSegment(ticker, StandardCharsets.UTF_8)
+                    + "?range=1d&interval=5m";
+            if (!urlGuard.isAllowed(url)) return null;
+
             ResponseEntity<Map> response = restTemplate.exchange(
-                    CHART_API + ticker + "?range=1d&interval=5m",
+                    URI.create(url),
                     HttpMethod.GET,
                     new HttpEntity<>(headers),
                     Map.class);

@@ -136,4 +136,49 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Dependency vulnerability scanning (OWASP A06 - Vulnerable and Outdated Components).
+
+          Behind a profile rather than bound to the default build on purpose. The scan downloads
+          and updates a local copy of the NVD database, which takes minutes on a cold cache - long
+          enough that, wired into every `mvn test`, it would be switched off within a week. Run it
+          on a schedule and in CI instead:
+
+              mvn -Psecurity verify
+
+          It fails the build on any dependency with a CVSS score of 7 or higher. NVD now rate-limits
+          anonymous callers heavily; set NVD_API_KEY (free, from nvd.nist.gov) to avoid a slow crawl.
+        -->
+        <profile>
+            <id>security</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>10.0.4</version>
+                        <configuration>
+                            <failBuildOnCVSS>7</failBuildOnCVSS>
+                            <assemblyAnalyzerEnabled>false</assemblyAnalyzerEnabled>
+                            <nodeAnalyzerEnabled>false</nodeAnalyzerEnabled>
+                            <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                            <formats>
+                                <format>HTML</format>
+                                <format>JSON</format>
+                            </formats>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
