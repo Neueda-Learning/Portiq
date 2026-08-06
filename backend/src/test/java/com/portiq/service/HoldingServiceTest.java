@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -96,17 +97,63 @@ class HoldingServiceTest {
         request.setPurchasePrice(new BigDecimal("200.00"));
 
         when(portfolioService.getById(1L)).thenReturn(portfolio);
-        when(holdingRepository.save(any(Holding.class))).thenAnswer(inv -> {
-            Holding h = inv.getArgument(0);
-            h.setId(11L);
-            return h;
+        when(holdingRepository.findAll()).thenReturn(List.of());
+        // The merge path writes through saveAll now, so that one import performs a single write
+        // instead of one per row. The behaviour this test asserts is unchanged.
+        when(holdingRepository.saveAll(anyList())).thenAnswer(inv -> {
+            List<Holding> saved = inv.getArgument(0);
+            saved.forEach(h -> h.setId(11L));
+            return saved;
         });
 
         Holding result = holdingService.addHolding(1L, request);
 
         assertThat(result.getTicker()).isEqualTo("TSLA");
         assertThat(result.getId()).isEqualTo(11L);
-        verify(holdingRepository).save(any(Holding.class));
+        verify(holdingRepository).saveAll(anyList());
+    }
+
+    @Test
+    void mergeAll_readsTheTableOnceForTheWholeBatch() {
+        // The regression this guards: mergeOrCreate used to be called in a loop by the importers,
+        // so a 500-row broker export performed 500 full table reads - each one decrypting every
+        // field of every existing row.
+        when(holdingRepository.findAll()).thenReturn(List.of());
+        when(holdingRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        holdingService.mergeAll(portfolio, List.of(
+                requestFor("TSLA", "5", "200.00"),
+                requestFor("AAPL", "3", "150.00"),
+                requestFor("MSFT", "2", "300.00")));
+
+        verify(holdingRepository, times(1)).findAll();
+        verify(holdingRepository, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    void mergeAll_combinesRepeatedTickersWithinOneBatch() {
+        // Two buys of the same stock in one import must land as one position at weighted-average
+        // cost. The per-row version only got this right by writing and re-reading between rows.
+        when(holdingRepository.findAll()).thenReturn(List.of());
+        when(holdingRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        List<Holding> saved = holdingService.mergeAll(portfolio, List.of(
+                requestFor("TSLA", "10", "100.00"),
+                requestFor("TSLA", "10", "200.00")));
+
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getQuantity()).isEqualByComparingTo("20");
+        assertThat(saved.get(0).getPurchasePrice()).isEqualByComparingTo("150.0000");
+    }
+
+    private HoldingRequest requestFor(String ticker, String quantity, String price) {
+        HoldingRequest request = new HoldingRequest();
+        request.setTicker(ticker);
+        request.setName(ticker);
+        request.setType(HoldingType.STOCK);
+        request.setQuantity(new BigDecimal(quantity));
+        request.setPurchasePrice(new BigDecimal(price));
+        return request;
     }
 
     @Test

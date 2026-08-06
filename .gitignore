@@ -10,6 +10,10 @@ frontend/.env
 backend/target/
 backend/backend-run.log
 
+# Locally generated development JWT key. Only ever created when JWT_SECRET is unset;
+# it keeps dev sessions alive across restarts and must never reach the repository.
+backend/.dev-secrets/
+
 # Frontend
 frontend/node_modules/
 frontend/dist/

@@ -31,4 +31,12 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: "./src/test/setup.js",
+    // The PWA plugin generates a service worker at build time; nothing under test needs it, and
+    // leaving it in makes every run write files into dist/.
+    exclude: ["node_modules/**", "dist/**"],
+  },
 });
