@@ -109,7 +109,7 @@ cp .env.prod.example .env.prod    # then fill in the secrets
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
-Then open <http://localhost:8080>.
+Then open <http://localhost:8090>.
 
 CI and CD are split: **GitHub Actions** runs the backend tests, the frontend
 build and both image builds on every push and pull request; **Jenkins**, running

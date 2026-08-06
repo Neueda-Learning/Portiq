@@ -21,7 +21,8 @@ pipeline {
     environment {
         COMPOSE_FILE         = 'docker-compose.prod.yml'
         COMPOSE_PROJECT_NAME = 'portiq'
-        APP_PORT             = '8080'
+        // 8090, not 8080: Jenkins itself defaults to 8080 and would collide.
+        APP_PORT             = '8090'
         IMAGE_TAG            = "${env.BUILD_NUMBER}"
 
         // Compose interpolates these when it parses the file, which happens on

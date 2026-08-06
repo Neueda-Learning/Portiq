@@ -5,7 +5,7 @@ and proxying `/api` to Spring Boot, and MySQL behind both. Only the frontend
 publishes a host port.
 
 ```text
-browser ──> :8080  frontend (nginx)  ──/api/*──> backend (Spring Boot :4001)
+browser ──> :8090  frontend (nginx)  ──/api/*──> backend (Spring Boot :4001)
                    serves /assets, SPA fallback              │
                                                              v
                                                        mysql (:3306)
@@ -107,11 +107,11 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 **4. Check:**
 
 ```bash
-curl -fsS http://localhost:8080/actuator/health   # {"status":"UP"}
-curl -fsSI http://localhost:8080/                 # 200
+curl -fsS http://localhost:8090/actuator/health   # {"status":"UP"}
+curl -fsSI http://localhost:8090/                 # 200
 ```
 
-Open <http://localhost:8080> and log in with `OWNER_USERNAME` / `OWNER_PASSWORD`.
+Open <http://localhost:8090> and log in with `OWNER_USERNAME` / `OWNER_PASSWORD`.
 
 Useful afterwards:
 
@@ -148,7 +148,9 @@ echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
 sudo apt update && sudo apt install -y jenkins
 ```
 
-**Move Jenkins off port 8080 before starting it** — that is the app's port:
+**Move Jenkins off port 8080 before starting it.** The app is on 8090 to stay
+clear of Jenkins, but 8080 is often already taken on a shared training VM — check
+with `sudo ss -tlnp | grep ':808'` and pick a free port if 8081 is busy too:
 
 ```bash
 sudo mkdir -p /etc/systemd/system/jenkins.service.d
@@ -199,18 +201,18 @@ instance's inbound rules to allow, ideally sourced to your own IP rather than
 
 | Port | For |
 |---|---|
-| 8080 | the application |
+| 8090 | the application |
 | 8081 | the Jenkins UI |
 
 **Origin.** Set `WEBAUTHN_ORIGIN` in `.env.prod` to the URL you actually type,
-for example `http://<public-ip>:8080`, and `WEBAUTHN_RP_ID` to the bare host.
+for example `http://<public-ip>:8090`, and `WEBAUTHN_RP_ID` to the bare host.
 Note that biometric login will still not work over plain HTTP to a public IP —
 WebAuthn requires a secure context, which only `localhost` and HTTPS satisfy.
 Password login is unaffected. To demo biometrics, either use an SSH tunnel so
 the browser sees `localhost`:
 
 ```bash
-ssh -L 8080:localhost:8080 ec2-user@<public-ip>
+ssh -L 8090:localhost:8090 ec2-user@<public-ip>
 ```
 
 or put the app behind HTTPS with a real domain.
@@ -279,7 +281,7 @@ the database and start clean.
 
 **Biometric login fails after deploying** — `WEBAUTHN_ORIGIN` must exactly match
 the URL in the address bar, and WebAuthn requires a secure context.
-`http://localhost:8080` qualifies; `http://192.168.x.x:8080` does not.
+`http://localhost:8090` qualifies; `http://192.168.x.x:8090` does not.
 
 **Smoke test times out but the app works in a browser** — the backend takes
 longer than 150s to boot on a cold first run while Hibernate creates the schema.
