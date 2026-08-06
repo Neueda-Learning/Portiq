@@ -41,6 +41,17 @@ jobs:
       - name: Run tests
         run: mvn -B test
 
+      # if: always() so the reports survive a failing run - which is the only time anyone
+      # goes looking for them. Without this the evidence disappears with the runner.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portiq-backend-test-reports
+          path: backend/target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Package
         run: mvn -B package -DskipTests
 

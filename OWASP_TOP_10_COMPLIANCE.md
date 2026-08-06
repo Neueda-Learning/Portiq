@@ -296,4 +296,4 @@ scripts/run-with-logs.sh all
 
 - `SECURITY.md` — control design, configuration reference and operational guidance
 - `logs/README.md` — log locations, retention and how to read the audit trail
-- `DEPLOYMENT.md` — deployment procedure and required environment variables
+- `docs/DEPLOYMENT.md` — deployment procedure and required environment variables

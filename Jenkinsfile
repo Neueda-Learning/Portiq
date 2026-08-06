@@ -139,6 +139,17 @@ pipeline {
             '''
         }
         always {
+            // Capture the deployed stack's logs as a build artifact. Printing them to the
+            // console is not enough - console output is trimmed by the log rotator after
+            // 20 builds, while an archived artifact stays attached to the build that
+            // produced it, which is what makes "it broke three deploys ago" answerable.
+            sh '''
+                mkdir -p logs/deploy
+                docker compose ps > logs/deploy/compose-ps.txt 2>&1 || true
+                docker compose logs --no-color --tail 2000 > logs/deploy/compose.log 2>&1 || true
+                docker compose logs --no-color --tail 2000 backend > logs/deploy/backend.log 2>&1 || true
+            '''
+            archiveArtifacts artifacts: 'logs/deploy/*', allowEmptyArchive: true, fingerprint: false
             sh 'docker image prune -f --filter "until=168h" || true'
         }
     }
