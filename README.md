@@ -142,6 +142,13 @@ cd frontend && npm test     # 25 tests
 
 See [docs/TESTING.md](docs/TESTING.md) for what is tested and why, conventions, and the known gaps.
 
+## Delivery board
+
+`docs/delivery-board.html` is a self-contained kanban board covering every capability in the
+system — 216 cards across 18 areas, each naming the endpoint, class or file behind it. Open the
+file in a browser; there is no build step and no server. Card state is kept per browser, and
+Export/Import hands a board to a teammate.
+
 ## Contributing
 
 Short-lived branches off `main`, reviewed pull requests, delete on merge — see

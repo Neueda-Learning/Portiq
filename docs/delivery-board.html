@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Portiq — System Delivery Board</title>
+<!--
+  A self-contained kanban board covering every capability in Portiq.
+
+  No build step, no server, no network: open this file in a browser. Card state is
+  kept in localStorage, and Export/Import moves a board between machines so the
+  team can share one.
+
+  The seed data is an inventory of what the system actually contains - every
+  endpoint, engine, security control, screen and document - so the board is a map
+  of the software as well as a place to track work on it.
+-->
+<style>
+  /* ---------- Tokens -------------------------------------------------
+     Neutrals are biased toward the brand teal rather than pure grey, so the
+     ground and the accent read as one system. Semantic colours stay separate
+     from the accent: the accent means "Portiq", the semantics mean "look here".
+  ------------------------------------------------------------------- */
+  :root {
+    --ground:        #F4F7F6;
+    --surface:       #FFFFFF;
+    --surface-sunk:  #EDF2F0;
+    --line:          #DDE5E2;
+    --line-strong:   #C4D0CC;
+    --ink:           #0F1A17;
+    --ink-muted:     #55655F;
+    --ink-faint:     #8A9994;
+
+    --accent:        #00A67E;
+    --accent-ink:    #00795C;
+    --accent-wash:   #E4F4EF;
+
+    --critical:      #C93A52;
+    --critical-wash: #FBE9EC;
+    --warning:       #B87413;
+    --warning-wash:  #FBF0DE;
+    --steel:         #3F6E96;
+    --steel-wash:    #E7EFF5;
+    --violet:        #6B5AA6;
+    --violet-wash:   #EEEBF7;
+
+    --shadow-card:   0 1px 2px rgba(15, 26, 23, .06), 0 1px 1px rgba(15, 26, 23, .04);
+    --shadow-lift:   0 8px 20px rgba(15, 26, 23, .13), 0 2px 5px rgba(15, 26, 23, .07);
+
+    --sans: "Segoe UI Variable Display", "Segoe UI", -apple-system,
+            BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono",
+            Consolas, "Liberation Mono", monospace;
+
+    --r-sm: 4px;
+    --r-md: 7px;
+    --r-lg: 11px;
+  }
+
+  /* Dark theme is defined at token level only. Components never restyle inside
+     the media query, so the explicit toggle below can win in both directions
+     without a specificity fight. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:        #0B1211;
+      --surface:       #141D1B;
+      --surface-sunk:  #101917;
+      --line:          #253430;
+      --line-strong:   #35463F;
+      --ink:           #E6EEEB;
+      --ink-muted:     #93A5A0;
+      --ink-faint:     #667873;
+      --accent:        #2ED3A7;
+      --accent-ink:    #7FE9C9;
+      --accent-wash:   #0E2A23;
+      --critical:      #F27289;
+      --critical-wash: #2E151A;
+      --warning:       #E2A24A;
+      --warning-wash:  #2C2113;
+      --steel:         #7FB0D4;
+      --steel-wash:    #14232E;
+      --violet:        #A899DC;
+      --violet-wash:   #1D1930;
+      --shadow-card:   0 1px 2px rgba(0, 0, 0, .5);
+      --shadow-lift:   0 10px 24px rgba(0, 0, 0, .55);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:        #0B1211;
+    --surface:       #141D1B;
+    --surface-sunk:  #101917;
+    --line:          #253430;
+    --line-strong:   #35463F;
+    --ink:           #E6EEEB;
+    --ink-muted:     #93A5A0;
+    --ink-faint:     #667873;
+    --accent:        #2ED3A7;
+    --accent-ink:    #7FE9C9;
+    --accent-wash:   #0E2A23;
+    --critical:      #F27289;
+    --critical-wash: #2E151A;
+    --warning:       #E2A24A;
+    --warning-wash:  #2C2113;
+    --steel:         #7FB0D4;
+    --steel-wash:    #14232E;
+    --violet:        #A899DC;
+    --violet-wash:   #1D1930;
+    --shadow-card:   0 1px 2px rgba(0, 0, 0, .5);
+    --shadow-lift:   0 10px 24px rgba(0, 0, 0, .55);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+
+  .shell { max-width: 1720px; margin: 0 auto; padding: 26px 22px 52px;
+           display: flex; flex-direction: column; gap: 18px; }
+
+  /* ---------- Masthead ---------- */
+  .masthead { display: flex; flex-wrap: wrap; align-items: flex-end;
+              justify-content: space-between; gap: 16px; }
+  .title-block { display: flex; flex-direction: column; gap: 4px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+             text-transform: uppercase; color: var(--ink-faint); }
+  h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -.021em; text-wrap: balance; }
+  .subtitle { margin: 0; color: var(--ink-muted); font-size: 13.5px; max-width: 66ch; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+
+  .btn { font-family: var(--sans); font-size: 12.5px; font-weight: 550; color: var(--ink);
+         background: var(--surface); border: 1px solid var(--line-strong);
+         border-radius: var(--r-md); padding: 7px 12px; cursor: pointer;
+         transition: background .13s ease, border-color .13s ease, transform .13s ease; }
+  .btn:hover { background: var(--surface-sunk); border-color: var(--ink-faint); }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #FFF; }
+  :root[data-theme="dark"] .btn-primary { color: #06231C; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .btn-primary { color: #06231C; }
+  }
+  .btn-primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+
+  /* ---------- Summary ---------- */
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+             gap: 1px; background: var(--line); border: 1px solid var(--line);
+             border-radius: var(--r-lg); overflow: hidden; }
+  .stat { background: var(--surface); padding: 12px 15px; display: flex;
+          flex-direction: column; gap: 2px; }
+  .stat-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .11em;
+                text-transform: uppercase; color: var(--ink-faint); }
+  .stat-value { font-size: 24px; font-weight: 620; letter-spacing: -.02em;
+                font-variant-numeric: tabular-nums; }
+  .stat-value.is-accent { color: var(--accent); }
+  .stat-note { font-size: 11.5px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .meter { height: 5px; border-radius: 99px; background: var(--surface-sunk);
+           overflow: hidden; margin-top: 5px; }
+  .meter span { display: block; height: 100%; background: var(--accent); border-radius: 99px;
+                transition: width .35s ease; }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+              padding: 11px 13px; background: var(--surface);
+              border: 1px solid var(--line); border-radius: var(--r-lg); }
+  .ctl-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .11em;
+               text-transform: uppercase; color: var(--ink-faint); }
+
+  input[type="search"], input[type="text"], select {
+    font-family: var(--sans); font-size: 13px; color: var(--ink);
+    background: var(--ground); border: 1px solid var(--line-strong);
+    border-radius: var(--r-md); padding: 7px 10px;
+  }
+  input[type="search"] { flex: 1 1 230px; min-width: 170px; }
+  select { font-family: var(--mono); font-size: 12px; max-width: 210px; }
+
+  .chip { font-family: var(--mono); font-size: 11.5px; font-weight: 500; padding: 4px 10px;
+          border-radius: 99px; border: 1px solid var(--line-strong); background: transparent;
+          color: var(--ink-muted); cursor: pointer;
+          transition: background .13s ease, color .13s ease, border-color .13s ease; }
+  .chip:hover { border-color: var(--ink-faint); color: var(--ink); }
+  .chip[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent);
+                               color: var(--accent-ink); }
+  .divider { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+
+  /* ---------- Board ---------- */
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(262px, 1fr);
+           gap: 13px; overflow-x: auto; padding-bottom: 10px; align-items: start; }
+  .column { background: var(--surface-sunk); border: 1px solid var(--line);
+            border-radius: var(--r-lg); display: flex; flex-direction: column; min-height: 170px; }
+  .column.is-target { border-color: var(--accent); background: var(--accent-wash); }
+  .col-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 9px;
+              border-bottom: 1px solid var(--line); }
+  .col-stripe { width: 3px; height: 15px; border-radius: 99px; background: var(--stage, var(--ink-faint)); }
+  .col-name { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+              text-transform: uppercase; font-weight: 600; }
+  .col-count { margin-left: auto; font-family: var(--mono); font-size: 11.5px;
+               font-variant-numeric: tabular-nums; color: var(--ink-muted);
+               background: var(--surface); border: 1px solid var(--line);
+               border-radius: 99px; padding: 1px 8px; }
+  .col-count.at-limit { color: var(--warning); border-color: var(--warning);
+                        background: var(--warning-wash); font-weight: 600; }
+
+  /* Capped so a 100-card column does not make the page thousands of pixels tall
+     and hide the other columns' contents off-screen. */
+  .col-body { display: flex; flex-direction: column; gap: 7px; padding: 9px;
+              flex: 1; max-height: 68vh; overflow-y: auto; }
+  .col-empty { font-size: 12px; color: var(--ink-faint); text-align: center;
+               padding: 16px 8px; border: 1px dashed var(--line-strong); border-radius: var(--r-md); }
+
+  /* ---------- Card ---------- */
+  .card { background: var(--surface); border: 1px solid var(--line);
+          border-left: 3px solid var(--type-color, var(--ink-faint));
+          border-radius: var(--r-md); padding: 9px 10px; box-shadow: var(--shadow-card);
+          cursor: grab; display: flex; flex-direction: column; gap: 6px;
+          transition: box-shadow .13s ease, transform .13s ease; }
+  .card:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+  .card:active { cursor: grabbing; }
+  .card.is-dragging { opacity: .42; }
+
+  .card-top { display: flex; align-items: center; gap: 6px; }
+  .type-tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: .1em;
+              text-transform: uppercase; font-weight: 600; padding: 2px 6px;
+              border-radius: var(--r-sm); color: var(--type-color); background: var(--type-wash); }
+  .area-tag { font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint);
+              letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .owner { margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 600;
+           letter-spacing: .04em; width: 23px; height: 23px; display: grid; place-items: center;
+           border-radius: 50%; background: var(--surface-sunk); border: 1px solid var(--line-strong);
+           color: var(--ink-muted); cursor: pointer; padding: 0;
+           transition: border-color .12s ease, color .12s ease; }
+  .owner:hover { border-color: var(--accent); color: var(--accent); }
+  .owner.unassigned { border-style: dashed; color: var(--ink-faint); }
+
+  .card-title { font-size: 13px; line-height: 1.35; font-weight: 520; text-wrap: pretty; }
+  .card-foot { display: flex; align-items: center; gap: 7px; font-family: var(--mono);
+               font-size: 10px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .card-ref { color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-flag { color: var(--critical); font-weight: 700; }
+  .card-actions { display: flex; gap: 2px; margin-left: auto; }
+
+  .icon-btn { font-family: var(--mono); font-size: 12px; line-height: 1; width: 20px; height: 20px;
+              display: grid; place-items: center; border: 1px solid transparent;
+              border-radius: var(--r-sm); background: transparent; color: var(--ink-faint);
+              cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  .icon-btn:hover { background: var(--surface-sunk); border-color: var(--line-strong); color: var(--ink); }
+  .icon-btn:disabled { opacity: .28; cursor: not-allowed; }
+
+  /* ---------- Composer ---------- */
+  .composer { display: none; flex-wrap: wrap; gap: 8px; padding: 13px; background: var(--surface);
+              border: 1px solid var(--line); border-radius: var(--r-lg); align-items: center; }
+  .composer.open { display: flex; }
+  .composer input[type="text"] { flex: 1 1 280px; }
+  .hint { flex-basis: 100%; font-size: 12px; color: var(--ink-muted); margin: 0; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between;
+           align-items: center; padding-top: 14px; border-top: 1px solid var(--line);
+           font-size: 12px; color: var(--ink-faint); }
+  footer kbd { font-family: var(--mono); font-size: 10.5px; background: var(--surface);
+               border: 1px solid var(--line-strong); border-bottom-width: 2px;
+               border-radius: var(--r-sm); padding: 1px 5px; color: var(--ink-muted); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 760px) {
+    .shell { padding: 18px 12px 36px; }
+    h1 { font-size: 21px; }
+    .board { grid-auto-columns: minmax(238px, 86vw); }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header class="masthead">
+    <div class="title-block">
+      <span class="eyebrow">Portiq · Portfolio Management System</span>
+      <h1>System Delivery Board</h1>
+      <p class="subtitle">
+        Every capability in the system — endpoints, analytics engines, security controls, screens
+        and documentation. Drag a card to move it, click an avatar to claim it, or focus a card
+        and use the arrow keys.
+      </p>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-primary" id="add-toggle" aria-expanded="false">New card</button>
+      <button class="btn" id="export">Export</button>
+      <button class="btn" id="import">Import</button>
+      <button class="btn" id="reset">Reset</button>
+      <button class="btn" id="theme" aria-label="Switch colour theme">Theme</button>
+    </div>
+  </header>
+
+  <section class="summary" id="summary" aria-label="Delivery summary"></section>
+
+  <div class="controls">
+    <input type="search" id="search" placeholder="Search titles, files and endpoints…" aria-label="Search cards" />
+    <select id="area-filter" aria-label="Filter by area"></select>
+    <span class="divider"></span>
+    <span class="ctl-label">Type</span>
+    <span id="type-chips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+    <span class="divider"></span>
+    <span class="ctl-label">Owner</span>
+    <span id="owner-chips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+  </div>
+
+  <form class="composer" id="composer" aria-label="Add a card">
+    <input type="text" id="new-title" placeholder="What needs doing?" maxlength="140" required />
+    <select id="new-type" aria-label="Type"></select>
+    <select id="new-area" aria-label="Area"></select>
+    <select id="new-owner" aria-label="Owner">
+      <option value="">unassigned</option>
+      <option value="AV">Aaditya</option>
+      <option value="AK">Anmol</option>
+      <option value="PJ">Palak</option>
+    </select>
+    <select id="new-column" aria-label="Column"></select>
+    <button class="btn btn-primary" type="submit">Add</button>
+    <p class="hint">Saved in this browser. Use Export to hand the board to a teammate.</p>
+  </form>
+
+  <div class="board" id="board" role="list" aria-label="Delivery columns"></div>
+
+  <footer>
+    <span>
+      Drag between columns, or focus a card and press <kbd>←</kbd> <kbd>→</kbd>.
+      Click an avatar to claim a card.
+    </span>
+    <span id="saved-note">Saved locally</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE_KEY = "portiq-system-board-v2";
+
+  var COLUMNS = [
+    { id: "backlog",  name: "Backlog",     stage: "var(--ink-faint)", wip: 0 },
+    { id: "ready",    name: "Ready",       stage: "var(--steel)",     wip: 0 },
+    { id: "progress", name: "In Progress", stage: "var(--warning)",   wip: 4 },
+    { id: "review",   name: "In Review",   stage: "var(--critical)",  wip: 4 },
+    { id: "done",     name: "Shipped",     stage: "var(--accent)",    wip: 0 }
+  ];
+
+  var TYPES = {
+    security: { color: "var(--critical)",  wash: "var(--critical-wash)" },
+    feature:  { color: "var(--accent)",    wash: "var(--accent-wash)" },
+    api:      { color: "var(--violet)",    wash: "var(--violet-wash)" },
+    fix:      { color: "var(--warning)",   wash: "var(--warning-wash)" },
+    chore:    { color: "var(--steel)",     wash: "var(--steel-wash)" },
+    docs:     { color: "var(--ink-muted)", wash: "var(--surface-sunk)" }
+  };
+
+  var OWNERS = { AV: "Aaditya", AK: "Anmol", PJ: "Palak" };
+  var OWNER_CYCLE = ["", "AV", "AK", "PJ"];
+
+  /* ------------------------------------------------------------------
+     Seed: an inventory of the system as built.
+     Tuple order: [title, type, area, column, ref, owner, flagged]
+     ------------------------------------------------------------------ */
+  var A = {
+    auth: "Auth & Session", bio: "Biometrics / WebAuthn", enc: "Data Encryption",
+    sec: "Security Hardening", port: "Portfolio & Holdings", io: "Import & Export",
+    mkt: "Market Data", risk: "Analytics — Risk", rec: "Analytics — Recommendations",
+    ai: "AI Features", dash: "Dashboard & Charts", mob: "Mobile", ui: "UI Foundations",
+    api: "API & Contracts", infra: "Infrastructure & CI/CD", obs: "Observability",
+    test: "Testing", doc: "Documentation"
+  };
+
+  var SEED = [
+    /* ---- Auth & Session ---- */
+    ["Username + password login", "api", A.auth, "done", "POST /api/auth/login", "AV"],
+    ["Server-side logout via token denylist", "api", A.auth, "done", "POST /api/auth/logout", "AV"],
+    ["Current-user endpoint", "api", A.auth, "done", "GET /api/auth/me", "AV"],
+    ["JWT issue with issuer, jti and expiry", "security", A.auth, "done", "JwtService", "AV"],
+    ["JWT verification filter on every request", "security", A.auth, "done", "JwtAuthFilter", "AV"],
+    ["Token denylist so logout truly revokes", "security", A.auth, "done", "TokenDenylist", "AV"],
+    ["Seeded owner account on first boot", "feature", A.auth, "done", "DataSeeder", ""],
+    ["Stable development signing key", "fix", A.auth, "done", "JwtService", "AK"],
+    ["Protected routes in the SPA", "feature", A.auth, "done", "ProtectedRoute.jsx", ""],
+    ["Auth context with session restore", "feature", A.auth, "done", "AuthContext.jsx", ""],
+    ["401 clears stale token and redirects", "fix", A.auth, "done", "apiClient.js", "AV"],
+    ["Username enumeration resistance", "security", A.auth, "done", "UserService", "AV"],
+    ["Failed-login lockout per account and IP", "security", A.auth, "done", "LoginAttemptService", "AV"],
+
+    /* ---- Biometrics / WebAuthn ---- */
+    ["Registration options ceremony", "api", A.bio, "done", "POST /webauthn/registration/options", ""],
+    ["Registration verify and credential store", "api", A.bio, "done", "POST /webauthn/registration/verify", ""],
+    ["Login options ceremony", "api", A.bio, "done", "POST /webauthn/login/options", ""],
+    ["Login verify issues a session token", "api", A.bio, "done", "POST /webauthn/login/verify", ""],
+    ["CBOR attestation decoder", "feature", A.bio, "done", "CborReader", ""],
+    ["ES256 / RS256 signature verification", "security", A.bio, "done", "WebAuthnCrypto", ""],
+    ["Challenge store with expiry", "security", A.bio, "done", "WebAuthnChallengeStore", ""],
+    ["Replay detection via sign counter", "security", A.bio, "done", "WebAuthnService", ""],
+    ["Origin and relying-party binding", "security", A.bio, "done", "WebAuthnService", ""],
+    ["Browser credential API wiring", "feature", A.bio, "done", "utils/webauthn.js", ""],
+    ["Enable Biometrics from the account screen", "feature", A.bio, "done", "MobileAccountPage", ""],
+    ["Generic failure message on rejected assertion", "security", A.bio, "done", "AuthController", "AV"],
+
+    /* ---- Data Encryption ---- */
+    ["AES-256-GCM converter for text columns", "security", A.enc, "done", "EncryptedStringConverter", ""],
+    ["Encrypted BigDecimal converter", "security", A.enc, "done", "EncryptedBigDecimalConverter", ""],
+    ["Encrypted LocalDate converter", "security", A.enc, "done", "EncryptedLocalDateConverter", ""],
+    ["Random IV per value", "security", A.enc, "done", "EncryptedStringConverter", ""],
+    ["Authenticated encryption detects tampering", "security", A.enc, "done", "GCM tag", ""],
+    ["Key holder outside the Spring context", "chore", A.enc, "done", "EncryptionKeyHolder", ""],
+    ["Startup validation of the AES key format", "security", A.enc, "done", "StartupSecurityValidator", "AV"],
+    ["BCrypt cost 12 for the account password", "security", A.enc, "done", "SecurityConfig", "AV"],
+    ["TLS to the database by default", "security", A.enc, "done", "application-prod.properties", "AV"],
+
+    /* ---- Security Hardening ---- */
+    ["Deny-by-default authorisation", "security", A.sec, "done", "SecurityConfig", "AV"],
+    ["Content-Security-Policy on every response", "security", A.sec, "done", "SecurityConfig", "AV"],
+    ["HSTS, Referrer-Policy, Permissions-Policy", "security", A.sec, "done", "SecurityConfig", "AV"],
+    ["X-Frame-Options DENY and nosniff", "security", A.sec, "done", "SecurityConfig", "AV"],
+    ["CORS explicit allowlist, wildcard refused", "security", A.sec, "done", "SecurityConfig", "AV"],
+    ["JSON 401 and 403 entry point", "security", A.sec, "done", "JsonAuthenticationEntryPoint", "AV"],
+    ["Rate limiting bucketed by endpoint cost", "security", A.sec, "done", "RateLimitFilter", "AV"],
+    ["Client IP resolution with trust-proxy switch", "security", A.sec, "done", "ClientIpResolver", "AV"],
+    ["SSRF guard: host allowlist + internal ranges", "security", A.sec, "done", "OutboundUrlGuard", "AV"],
+    ["Outbound timeouts, redirects not followed", "security", A.sec, "done", "HttpClientConfig", "AV"],
+    ["Upload validation by magic bytes", "security", A.sec, "done", "UploadValidator", "AV"],
+    ["CSV formula injection neutralised", "security", A.sec, "done", "ExportService", "AV"],
+    ["XXE-hardened feed parsing", "security", A.sec, "done", "RssFeedFetcher", "AV"],
+    ["javascript: and data: links stripped", "security", A.sec, "done", "RssFeedFetcher", "AV"],
+    ["Ticker pattern constraint before storage", "security", A.sec, "done", "HoldingRequest", "AV"],
+    ["Startup refuses prod on dev defaults", "security", A.sec, "done", "StartupSecurityValidator", "AV"],
+    ["No stack traces or Server header in responses", "security", A.sec, "done", "application.properties", "AV"],
+    ["Upstream error text kept out of responses", "security", A.sec, "done", "InsightsController", "AK"],
+    ["Dependency CVE scan enforced at CVSS 7", "security", A.sec, "done", "backend-ci.yml", "AK"],
+
+    /* ---- Portfolio & Holdings ---- */
+    ["List and create portfolios", "api", A.port, "done", "GET/POST /api/portfolios", ""],
+    ["Read, update, delete a portfolio", "api", A.port, "done", "/api/portfolios/{id}", ""],
+    ["Portfolio performance summary", "api", A.port, "done", "GET /{id}/performance", ""],
+    ["Per-portfolio holdings CRUD", "api", A.port, "done", "/api/portfolios/{id}/holdings", ""],
+    ["Flat cross-portfolio holdings view", "api", A.port, "done", "GET /api/holdings", ""],
+    ["Add holding with weighted-average merge", "feature", A.port, "done", "HoldingService", ""],
+    ["Update a holding", "api", A.port, "done", "PUT /api/holdings/{id}", ""],
+    ["Delete a holding", "api", A.port, "done", "DELETE /api/holdings/{id}", ""],
+    ["Bulk delete with a 1000-id cap", "api", A.port, "done", "POST /api/holdings/bulk-delete", "AV"],
+    ["Batch merge — one read, one write", "fix", A.port, "done", "HoldingService.mergeAll", "AK"],
+    ["Cost basis, current value, gain/loss maths", "feature", A.port, "done", "HoldingService", ""],
+    ["Holding form with client validation", "feature", A.port, "done", "HoldingForm.jsx", ""],
+    ["Sortable, selectable holdings table", "feature", A.port, "done", "DataTable.jsx", ""],
+    ["Confirm dialog before destructive actions", "feature", A.port, "done", "ConfirmDialog.jsx", ""],
+    ["Bounded quantity and price constraints", "security", A.port, "done", "HoldingRequest", "AV"],
+
+    /* ---- Import & Export ---- */
+    ["CSV import with per-row error reporting", "feature", A.io, "done", "POST /api/holdings/import/csv", ""],
+    ["Sample CSV template download", "api", A.io, "done", "GET /import/csv/sample", ""],
+    ["Excel and CSV smart import", "feature", A.io, "done", "SmartFileImportService", ""],
+    ["Statement screenshot import", "feature", A.io, "done", "POST /api/holdings/import/image", ""],
+    ["Spreadsheet text extraction", "feature", A.io, "done", "SpreadsheetTextExtractor", ""],
+    ["BUY/SELL netting to weighted-average cost", "feature", A.io, "done", "SmartFileImportService", ""],
+    ["Shared numeric cell parser", "fix", A.io, "done", "NumericCellParser", "AK"],
+    ["Currency codes and separators tolerated", "fix", A.io, "done", "NumericCellParser", "AK"],
+    ["Import row cap and clear error categories", "fix", A.io, "done", "HoldingImportService", "AK"],
+    ["Imported rows run full bean validation", "security", A.io, "done", "HoldingImportService", "AV"],
+    ["CSV export of the holdings report", "api", A.io, "done", "GET /api/holdings/export/csv", ""],
+    ["PDF export of the holdings report", "api", A.io, "done", "GET /api/holdings/export/pdf", ""],
+
+    /* ---- Market Data ---- */
+    ["Yahoo chart integration, typed payload", "chore", A.mkt, "done", "MarketDataFetcher", "AK"],
+    ["Live price lookup with purchase-price fallback", "feature", A.mkt, "done", "PriceLookupService", ""],
+    ["One year of daily closes for analytics", "feature", A.mkt, "done", "MarketDataFetcher", ""],
+    ["Bucketed price series per range", "feature", A.mkt, "done", "PriceSeriesFetcher", ""],
+    ["Portfolio value over time", "api", A.mkt, "done", "GET /api/holdings/history", ""],
+    ["Caffeine caches with per-feed TTLs", "chore", A.mkt, "done", "CacheConfig", ""],
+    ["Graceful degradation when a feed is down", "feature", A.mkt, "done", "MarketDataFetcher", "AK"],
+    ["Market news from keyless RSS feeds", "api", A.mkt, "done", "GET /api/news", ""],
+
+    /* ---- Analytics — Risk ---- */
+    ["Annualised volatility", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Beta against the NIFTY 50 benchmark", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Maximum drawdown", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Sharpe ratio", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Historical 95% Value at Risk", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["RSI (14)", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["SMA 50 and SMA 200", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["30-day and 90-day momentum", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["52-week range position", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Series alignment on common trading days", "feature", A.risk, "done", "MetricsCalculator", ""],
+    ["Composite per-stock risk score and band", "feature", A.risk, "done", "RiskAnalysisService", ""],
+    ["Value-weighted portfolio risk rollup", "feature", A.risk, "done", "RiskAnalysisService", ""],
+    ["Concentration (HHI) and diversification score", "feature", A.risk, "done", "RiskAnalysisService", ""],
+    ["Portfolio warnings generation", "feature", A.risk, "done", "RiskAnalysisService", ""],
+    ["Data-quality flags per ticker", "feature", A.risk, "done", "DataQuality", ""],
+    ["CASH treated as a zero-risk special case", "feature", A.risk, "done", "RiskAnalysisService", ""],
+    ["Portfolio risk report endpoint", "api", A.risk, "done", "GET /api/risk", ""],
+    ["Per-ticker risk lookup", "api", A.risk, "done", "GET /api/risk/{ticker}", ""],
+
+    /* ---- Analytics — Recommendations ---- */
+    ["Deterministic signal scoring", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Momentum, trend and RSI contributions", "feature", A.rec, "done", "RecommendationService", ""],
+    ["52-week positioning bonus and penalty", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Action mapping for held positions", "feature", A.rec, "done", "ACCUMULATE/HOLD/TRIM/SELL", ""],
+    ["New-idea universe with BUY/AVOID calls", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Confidence score from signal and data quality", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Suggested target weight percent", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Concentration and high-risk discounts", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Human-readable rule signals and reasons", "feature", A.rec, "done", "RecommendationService", ""],
+    ["Recommendations endpoint with ideas toggle", "api", A.rec, "done", "GET /api/recommendations", ""],
+    ["Per-ticker recommendation lookup", "api", A.rec, "done", "GET /api/recommendations/{ticker}", ""],
+    ["Educational disclaimer on every response", "docs", A.rec, "done", "RecommendationResponse", ""],
+
+    /* ---- AI Features ---- */
+    ["Plain-language portfolio summary", "api", A.ai, "done", "GET /api/insights/summary", ""],
+    ["Recommendation narration, prose only", "feature", A.ai, "done", "RecommendationNarrator", ""],
+    ["Numbers never come from the model", "security", A.ai, "done", "RecommendationNarrator", ""],
+    ["Vendor-agnostic chat completion client", "chore", A.ai, "done", "ChatCompletionClient", ""],
+    ["Typed chat completion response", "chore", A.ai, "done", "ChatCompletionResponse", "AK"],
+    ["Typed, tolerant model-output parsing", "chore", A.ai, "done", "LlmHoldingsParser", "AK"],
+    ["https-only enforcement for the model endpoint", "security", A.ai, "done", "ChatCompletionClient", "AV"],
+    ["Features degrade cleanly with no API key", "feature", A.ai, "done", "isAvailable()", ""],
+    ["Generative AI design documentation", "docs", A.ai, "done", "docs/generative-ai/ (12 files)", ""],
+
+    /* ---- Dashboard & Charts ---- */
+    ["Amount Invested stat card", "feature", A.dash, "done", "DashboardPage", ""],
+    ["Gain / Loss stat card", "feature", A.dash, "done", "DashboardPage", ""],
+    ["Return percentage stat card", "feature", A.dash, "done", "DashboardPage", ""],
+    ["Portfolio value trend chart", "feature", A.dash, "done", "TrendChart.jsx", ""],
+    ["Range switcher — 1D / 1W / 1M / All", "feature", A.dash, "done", "DashboardPage", ""],
+    ["Allocation pie chart", "feature", A.dash, "done", "AllocationPieChart.jsx", ""],
+    ["Performance comparison charts", "feature", A.dash, "done", "PerformanceCharts.jsx", ""],
+    ["Risk score gauge", "feature", A.dash, "done", "RiskScoreGauge.jsx", ""],
+    ["Risk breakdown chart", "feature", A.dash, "done", "RiskBreakdownChart.jsx", ""],
+    ["Risk metric grid and holdings table", "feature", A.dash, "done", "RiskMetricGrid.jsx", ""],
+    ["Recommendation action cards", "feature", A.dash, "done", "RecommendationCard.jsx", ""],
+    ["Market news panel", "feature", A.dash, "done", "NewsList.jsx", ""],
+    ["Auto-refreshing prices on an interval", "feature", A.dash, "done", "useInterval.js", ""],
+
+    /* ---- Mobile ---- */
+    ["Mobile shell with bottom navigation", "feature", A.mob, "done", "MobileShell.jsx", ""],
+    ["Mobile dashboard", "feature", A.mob, "done", "MobileDashboardPage.jsx", ""],
+    ["Mobile holdings with card list", "feature", A.mob, "done", "MobileHoldingsPage.jsx", ""],
+    ["Mobile insights — risk and recommendations", "feature", A.mob, "done", "MobileInsightsPage.jsx", ""],
+    ["Mobile account and biometric setup", "feature", A.mob, "done", "MobileAccountPage.jsx", ""],
+    ["Haptic feedback on interaction", "feature", A.mob, "done", "utils/haptics.js", "AV"],
+    ["Responsive breakpoint hook", "chore", A.mob, "done", "useIsMobile.js", ""],
+    ["Installable PWA with service worker", "feature", A.mob, "done", "vite-plugin-pwa", ""],
+
+    /* ---- UI Foundations ---- */
+    ["Error boundary at root and per route", "feature", A.ui, "done", "ErrorBoundary.jsx", "AK"],
+    ["Route-level code splitting", "chore", A.ui, "done", "App.jsx", "AK"],
+    ["Shared Loading component", "feature", A.ui, "done", "Loading.jsx", "AV"],
+    ["Skeleton placeholders while fetching", "feature", A.ui, "done", "Skeleton.jsx", ""],
+    ["Toast notification system", "feature", A.ui, "done", "ToastContext.jsx", ""],
+    ["Collapsible sidebar with persistence", "feature", A.ui, "done", "Sidebar.jsx", ""],
+    ["Modal and dialog primitives", "feature", A.ui, "done", "Modal.jsx", ""],
+    ["Client-side response cache with TTL", "chore", A.ui, "done", "utils/cache.js", ""],
+    ["Cache invalidation on holdings mutation", "fix", A.ui, "done", "holdingsService.js", ""],
+    ["Readable error messages, not status codes", "feature", A.ui, "done", "apiClient.js", ""],
+    ["en-IN currency and percent formatting", "feature", A.ui, "done", "formatters.js", ""],
+
+    /* ---- API & Contracts ---- */
+    ["OpenAPI document and Swagger UI", "docs", A.api, "done", "springdoc", ""],
+    ["Global exception handler with trace references", "api", A.api, "done", "GlobalExceptionHandler", ""],
+    ["Consistent JSON error envelope", "api", A.api, "done", "GlobalExceptionHandler", ""],
+    ["Bean validation on every request DTO", "api", A.api, "done", "jakarta.validation", ""],
+    ["Actuator health, info and metrics", "api", A.api, "done", "/actuator/**", ""],
+
+    /* ---- Infrastructure & CI/CD ---- */
+    ["Backend container image", "chore", A.infra, "done", "backend/Dockerfile", ""],
+    ["Frontend image with nginx", "chore", A.infra, "done", "frontend/Dockerfile", ""],
+    ["Compose stack for local development", "chore", A.infra, "done", "docker-compose.yml", ""],
+    ["Production compose stack", "chore", A.infra, "done", "docker-compose.prod.yml", ""],
+    ["Jenkins continuous delivery pipeline", "chore", A.infra, "done", "Jenkinsfile", ""],
+    ["Backend CI — tests, package, image", "chore", A.infra, "done", "backend-ci.yml", ""],
+    ["Frontend CI — tests, build, image", "chore", A.infra, "done", "frontend-ci.yml", ""],
+    ["H2, MySQL and Supabase profiles", "chore", A.infra, "done", "application-*.properties", ""],
+    ["Deploy smoke test after release", "chore", A.infra, "done", "Jenkinsfile", ""],
+
+    /* ---- Observability ---- */
+    ["Rolling application log", "feature", A.obs, "done", "logback-spring.xml", "PJ"],
+    ["Separate error log at WARN and above", "feature", A.obs, "done", "logback-spring.xml", "PJ"],
+    ["Security audit trail, 365-day retention", "security", A.obs, "done", "portiq-security.log", "PJ"],
+    ["Structured, injection-safe audit events", "security", A.obs, "done", "SecurityAuditLogger", "AV"],
+    ["Build and run log capture scripts", "chore", A.obs, "done", "scripts/run-with-logs.*", "PJ"],
+    ["CI test reports archived on failure", "chore", A.obs, "done", "backend-ci.yml", "PJ"],
+    ["Jenkins archives deploy logs", "chore", A.obs, "done", "Jenkinsfile", "PJ"],
+    ["Client IP logging can be disabled", "security", A.obs, "done", "AUDIT_LOG_CLIENT_IP", "AV"],
+
+    /* ---- Testing ---- */
+    ["298 backend tests", "chore", A.test, "done", "mvn test", ""],
+    ["25 frontend tests", "chore", A.test, "done", "npm test", "AK"],
+    ["Security hardening integration test", "chore", A.test, "done", "SecurityHardeningIntegrationTest", "AV"],
+    ["Rate limiter reachable in the real chain", "chore", A.test, "done", "RateLimitChainIntegrationTest", "AV"],
+    ["Financial maths coverage — 64 tests", "chore", A.test, "done", "MetricsCalculatorTest", ""],
+    ["Untrusted input parsing — 69 tests", "chore", A.test, "done", "UploadValidatorTest et al", "AK"],
+    ["Tests no longer write real log files", "fix", A.test, "done", "logback-test.xml", "PJ"],
+
+    /* ---- Documentation ---- */
+    ["README with quick start", "docs", A.doc, "done", "README.md", ""],
+    ["SECURITY.md — design and limitations", "docs", A.doc, "done", "SECURITY.md", "AV"],
+    ["OWASP Top 10 compliance report", "docs", A.doc, "done", "OWASP_TOP_10_COMPLIANCE.md", "PJ"],
+    ["Testing guide", "docs", A.doc, "done", "docs/TESTING.md", "AK"],
+    ["Branching strategy", "docs", A.doc, "done", "docs/BRANCHING_STRATEGY.md", "AK"],
+    ["Deployment guide", "docs", A.doc, "done", "docs/DEPLOYMENT.md", ""],
+    ["API documentation", "docs", A.doc, "done", "docs/api_docs.md", ""],
+    ["User stories", "docs", A.doc, "done", "docs/user_stories.md", ""],
+    ["Risk and recommendation design note", "docs", A.doc, "done", "docs/risk_and_recommnedation.md", ""],
+    ["Logging guide", "docs", A.doc, "done", "logs/README.md", "PJ"],
+
+    /* ---- Outstanding ---- */
+    ["Add NVD_API_KEY repository secret", "chore", A.infra, "ready", "unblocks the CVE scan", "", 1],
+    ["Repoint origin/HEAD from backend to main", "chore", A.infra, "ready", "misleads tooling", "", 1],
+    ["Archive the legacy backend/frontend branches", "chore", A.infra, "ready", "31+ commits stale", ""],
+    ["Branch protection rules on main", "chore", A.infra, "ready", "direct pushes possible", "", 1],
+    ["Fix README link to docs/DEPLOYMENT.md", "docs", A.doc, "ready", "broken since docs move", ""],
+    ["End-to-end browser tests", "chore", A.test, "backlog", "Playwright", ""],
+    ["Component tests for the page layer", "chore", A.test, "backlog", "known gap", ""],
+    ["Load tests to catch N+1 regressions", "chore", A.test, "backlog", "known gap", ""],
+    ["Contract tests against the market data API", "chore", A.test, "backlog", "shape changes are silent", ""],
+    ["Session token to httpOnly cookie", "security", A.sec, "backlog", "needs CSRF back", ""],
+    ["Redis-backed rate limits for multi-replica", "security", A.sec, "backlog", "per-instance today", ""],
+    ["Shared logout denylist across replicas", "security", A.auth, "backlog", "per-instance today", ""],
+    ["Split the Chart.js bundle further", "chore", A.ui, "backlog", "187 kB initial", ""],
+    ["Multi-user accounts and per-user portfolios", "feature", A.auth, "backlog", "single owner today", ""],
+    ["Price alerts and notifications", "feature", A.dash, "backlog", "", ""],
+    ["Real-time price streaming", "feature", A.mkt, "backlog", "polling today", ""],
+    ["Dividend and corporate action tracking", "feature", A.port, "backlog", "", ""],
+    ["Tax and capital gains reporting", "feature", A.port, "backlog", "", ""]
+  ];
+
+  var board = document.getElementById("board");
+  var summary = document.getElementById("summary");
+  var composer = document.getElementById("composer");
+  var savedNote = document.getElementById("saved-note");
+
+  var state = load();
+  var filters = { owner: null, type: null, area: "", query: "" };
+  var dragId = null;
+
+  function seed() {
+    return SEED.map(function (row, i) {
+      return {
+        id: "c" + (i + 1), title: row[0], type: row[1], area: row[2],
+        column: row[3], ref: row[4] || "", owner: row[5] || "", flagged: !!row[6]
+      };
+    });
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch (e) {
+      /* A corrupt store must not present an empty board with no explanation;
+         falling through to the seed leaves a working state. */
+    }
+    return seed();
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      note("Saved locally");
+    } catch (e) {
+      note("Could not save — this browser is blocking local storage");
+    }
+  }
+
+  var noteTimer;
+  function note(text) {
+    savedNote.textContent = text;
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(function () { savedNote.textContent = "Saved locally"; }, 2600);
+  }
+
+  function esc(text) {
+    return String(text).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+
+  function visible(card) {
+    if (filters.owner !== null && card.owner !== filters.owner) return false;
+    if (filters.type !== null && card.type !== filters.type) return false;
+    if (filters.area && card.area !== filters.area) return false;
+    if (filters.query) {
+      var hay = (card.title + " " + card.ref + " " + card.area).toLowerCase();
+      if (hay.indexOf(filters.query) === -1) return false;
+    }
+    return true;
+  }
+
+  /* ---------- Rendering ---------- */
+
+  function renderSummary() {
+    var total = state.length;
+    var done = state.filter(function (c) { return c.column === "done"; }).length;
+    var flight = state.filter(function (c) {
+      return c.column === "progress" || c.column === "review";
+    }).length;
+    var queued = total - done - flight;
+    var blocked = state.filter(function (c) { return c.flagged; }).length;
+    var areas = {};
+    state.forEach(function (c) { areas[c.area] = 1; });
+    var pct = total ? Math.round((done / total) * 100) : 0;
+
+    summary.innerHTML =
+      stat("Delivered", done, pct + "% of " + total + " cards", true, pct) +
+      stat("In flight", flight, "progress + review") +
+      stat("Queued", queued, "ready + backlog") +
+      stat("Areas", Object.keys(areas).length, "capability groups") +
+      stat("Needs a decision", blocked, blocked ? "flagged on the board" : "nothing flagged");
+  }
+
+  function stat(label, value, noteText, accent, meterPct) {
+    return '<div class="stat">' +
+      '<span class="stat-label">' + esc(label) + "</span>" +
+      '<span class="stat-value' + (accent ? " is-accent" : "") + '">' + value + "</span>" +
+      '<span class="stat-note">' + esc(noteText) + "</span>" +
+      (meterPct !== undefined
+        ? '<span class="meter"><span style="width:' + meterPct + '%"></span></span>' : "") +
+      "</div>";
+  }
+
+  function renderBoard() {
+    board.innerHTML = "";
+
+    COLUMNS.forEach(function (col) {
+      var shown = state.filter(function (c) { return c.column === col.id && visible(c); });
+      var all = state.filter(function (c) { return c.column === col.id; });
+
+      var section = document.createElement("section");
+      section.className = "column";
+      section.setAttribute("role", "listitem");
+      section.style.setProperty("--stage", col.stage);
+
+      var atLimit = col.wip > 0 && all.length > col.wip;
+      var filtering = shown.length !== all.length;
+      var count = filtering ? shown.length + " / " + all.length
+                            : (col.wip > 0 ? all.length + "/" + col.wip : String(all.length));
+
+      var head = document.createElement("div");
+      head.className = "col-head";
+      head.innerHTML = '<span class="col-stripe"></span>' +
+        '<span class="col-name">' + esc(col.name) + "</span>" +
+        '<span class="col-count' + (atLimit && !filtering ? " at-limit" : "") + '">' + count + "</span>";
+      section.appendChild(head);
+
+      var body = document.createElement("div");
+      body.className = "col-body";
+
+      if (!shown.length) {
+        var empty = document.createElement("p");
+        empty.className = "col-empty";
+        empty.textContent = all.length ? "Hidden by filters" : "Nothing here";
+        body.appendChild(empty);
+      } else {
+        shown.forEach(function (card) { body.appendChild(renderCard(card)); });
+      }
+
+      section.appendChild(body);
+
+      section.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        section.classList.add("is-target");
+      });
+      section.addEventListener("dragleave", function () { section.classList.remove("is-target"); });
+      section.addEventListener("drop", function (e) {
+        e.preventDefault();
+        section.classList.remove("is-target");
+        if (dragId) move(dragId, col.id);
+      });
+
+      board.appendChild(section);
+    });
+  }
+
+  function renderCard(card) {
+    var type = TYPES[card.type] || TYPES.chore;
+    var el = document.createElement("article");
+    el.className = "card";
+    el.draggable = true;
+    el.tabIndex = 0;
+    el.dataset.id = card.id;
+    el.style.setProperty("--type-color", type.color);
+    el.style.setProperty("--type-wash", type.wash);
+
+    var index = COLUMNS.findIndex(function (c) { return c.id === card.column; });
+    var ownerLabel = card.owner ? (OWNERS[card.owner] || card.owner) : "Unassigned";
+
+    el.setAttribute("aria-label", card.title + ". " + card.type + ", " + card.area +
+      ", " + ownerLabel + ", in " + COLUMNS[index].name + ". Arrow keys move it.");
+
+    el.innerHTML =
+      '<div class="card-top">' +
+        '<span class="type-tag">' + esc(card.type) + "</span>" +
+        '<span class="area-tag">' + esc(card.area) + "</span>" +
+        (card.flagged ? '<span class="card-flag" title="Needs a decision">!</span>' : "") +
+        '<button class="owner' + (card.owner ? "" : " unassigned") + '" ' +
+          'title="' + esc(ownerLabel) + ' — click to reassign" ' +
+          'aria-label="Owner: ' + esc(ownerLabel) + '. Click to reassign.">' +
+          esc(card.owner || "—") + "</button>" +
+      "</div>" +
+      '<p class="card-title">' + esc(card.title) + "</p>" +
+      '<div class="card-foot">' +
+        (card.ref ? '<span class="card-ref" title="' + esc(card.ref) + '">' + esc(card.ref) + "</span>" : "") +
+        '<span class="card-actions">' +
+          '<button class="icon-btn" data-act="left" title="Move left" aria-label="Move left"' +
+            (index === 0 ? " disabled" : "") + ">&larr;</button>" +
+          '<button class="icon-btn" data-act="right" title="Move right" aria-label="Move right"' +
+            (index === COLUMNS.length - 1 ? " disabled" : "") + ">&rarr;</button>" +
+          '<button class="icon-btn" data-act="del" title="Delete" aria-label="Delete card">&times;</button>' +
+        "</span>" +
+      "</div>";
+
+    el.addEventListener("dragstart", function (e) {
+      dragId = card.id;
+      el.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", card.id); } catch (err) { /* older browsers */ }
+    });
+    el.addEventListener("dragend", function () {
+      el.classList.remove("is-dragging");
+      dragId = null;
+    });
+
+    /* Drag and drop is pointer-only, so every move is on the keyboard too. */
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { e.preventDefault(); shift(card.id, 1); }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); shift(card.id, -1); }
+      if (e.key === "Delete")     { e.preventDefault(); remove(card.id); }
+    });
+
+    el.querySelector(".owner").addEventListener("click", function (e) {
+      e.stopPropagation();
+      cycleOwner(card.id);
+    });
+
+    el.querySelectorAll(".icon-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var act = btn.dataset.act;
+        if (act === "left") shift(card.id, -1);
+        if (act === "right") shift(card.id, 1);
+        if (act === "del") remove(card.id);
+      });
+    });
+
+    return el;
+  }
+
+  /* ---------- Mutations ---------- */
+
+  function find(id) { return state.filter(function (c) { return c.id === id; })[0]; }
+
+  function move(id, columnId) {
+    var card = find(id);
+    if (!card || card.column === columnId) return;
+    card.column = columnId;
+    commit();
+    focusCard(id);
+  }
+
+  function shift(id, delta) {
+    var card = find(id);
+    if (!card) return;
+    var index = COLUMNS.findIndex(function (c) { return c.id === card.column; });
+    var next = index + delta;
+    if (next < 0 || next >= COLUMNS.length) return;
+    card.column = COLUMNS[next].id;
+    commit();
+    focusCard(id);
+  }
+
+  function cycleOwner(id) {
+    var card = find(id);
+    if (!card) return;
+    var at = OWNER_CYCLE.indexOf(card.owner || "");
+    card.owner = OWNER_CYCLE[(at + 1) % OWNER_CYCLE.length];
+    commit();
+    focusCard(id);
+    note(card.owner ? "Assigned to " + OWNERS[card.owner] : "Unassigned");
+  }
+
+  function remove(id) {
+    state = state.filter(function (c) { return c.id !== id; });
+    commit();
+    note("Card deleted");
+  }
+
+  function focusCard(id) {
+    var el = board.querySelector('[data-id="' + id + '"]');
+    if (el) el.focus();
+  }
+
+  function commit() { save(); renderSummary(); renderBoard(); }
+
+  /* ---------- Controls ---------- */
+
+  var chipRegistry = [];
+
+  function chip(container, text, onClick, isActive) {
+    var btn = document.createElement("button");
+    btn.className = "chip";
+    btn.type = "button";
+    btn.textContent = text;
+    btn.setAttribute("aria-pressed", String(isActive()));
+    btn.addEventListener("click", function () { onClick(); syncChips(); });
+    chipRegistry.push({ el: btn, isActive: isActive });
+    container.appendChild(btn);
+  }
+
+  function syncChips() {
+    chipRegistry.forEach(function (c) { c.el.setAttribute("aria-pressed", String(c.isActive())); });
+    renderBoard();
+  }
+
+  var typeChips = document.getElementById("type-chips");
+  chip(typeChips, "all", function () { filters.type = null; }, function () { return filters.type === null; });
+  Object.keys(TYPES).forEach(function (t) {
+    chip(typeChips, t, function () { filters.type = t; }, function () { return filters.type === t; });
+  });
+
+  var ownerChips = document.getElementById("owner-chips");
+  chip(ownerChips, "everyone", function () { filters.owner = null; }, function () { return filters.owner === null; });
+  Object.keys(OWNERS).forEach(function (k) {
+    chip(ownerChips, OWNERS[k], function () { filters.owner = k; }, function () { return filters.owner === k; });
+  });
+  chip(ownerChips, "unassigned", function () { filters.owner = ""; }, function () { return filters.owner === ""; });
+
+  var areaFilter = document.getElementById("area-filter");
+  var areaNames = Object.keys(A).map(function (k) { return A[k]; }).sort();
+  areaFilter.innerHTML = '<option value="">All areas</option>' +
+    areaNames.map(function (a) { return '<option value="' + esc(a) + '">' + esc(a) + "</option>"; }).join("");
+  areaFilter.addEventListener("change", function () {
+    filters.area = areaFilter.value;
+    renderBoard();
+  });
+
+  var search = document.getElementById("search");
+  search.addEventListener("input", function () {
+    filters.query = search.value.trim().toLowerCase();
+    renderBoard();
+  });
+
+  var newType = document.getElementById("new-type");
+  newType.innerHTML = Object.keys(TYPES).map(function (t) {
+    return '<option value="' + t + '"' + (t === "chore" ? " selected" : "") + ">" + t + "</option>";
+  }).join("");
+
+  var newArea = document.getElementById("new-area");
+  newArea.innerHTML = areaNames.map(function (a) {
+    return '<option value="' + esc(a) + '">' + esc(a) + "</option>";
+  }).join("");
+
+  var columnSelect = document.getElementById("new-column");
+  columnSelect.innerHTML = COLUMNS.map(function (col) {
+    return '<option value="' + col.id + '"' + (col.id === "ready" ? " selected" : "") +
+      ">" + esc(col.name) + "</option>";
+  }).join("");
+
+  var addToggle = document.getElementById("add-toggle");
+  addToggle.addEventListener("click", function () {
+    var open = composer.classList.toggle("open");
+    addToggle.setAttribute("aria-expanded", String(open));
+    if (open) document.getElementById("new-title").focus();
+  });
+
+  composer.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var titleInput = document.getElementById("new-title");
+    var title = titleInput.value.trim();
+    if (!title) return;
+
+    state.push({
+      id: "c" + Date.now(), title: title, type: newType.value, area: newArea.value,
+      column: columnSelect.value, ref: "",
+      owner: document.getElementById("new-owner").value, flagged: false
+    });
+
+    titleInput.value = "";
+    commit();
+    note("Card added");
+    titleInput.focus();
+  });
+
+  document.getElementById("export").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "portiq-board.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    note("Exported portiq-board.json");
+  });
+
+  document.getElementById("import").addEventListener("click", function () {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var parsed = JSON.parse(String(reader.result));
+          if (!Array.isArray(parsed)) throw new Error("not an array");
+          state = parsed;
+          commit();
+          note("Imported " + parsed.length + " cards");
+        } catch (err) {
+          note("That file is not a board export");
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  });
+
+  document.getElementById("reset").addEventListener("click", function () {
+    if (!window.confirm("Reset to the full system inventory? Local changes are lost.")) return;
+    state = seed();
+    commit();
+    note("Board reset");
+  });
+
+  document.getElementById("theme").addEventListener("click", function () {
+    var root = document.documentElement;
+    var current = root.getAttribute("data-theme");
+    if (!current) {
+      current = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    root.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+  });
+
+  renderSummary();
+  renderBoard();
+})();
+</script>
+</body>
+</html>
