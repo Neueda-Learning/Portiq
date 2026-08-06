@@ -148,9 +148,18 @@ echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
 sudo apt update && sudo apt install -y jenkins
 ```
 
-**Move Jenkins off port 8080 before starting it.** The app is on 8090 to stay
-clear of Jenkins, but 8080 is often already taken on a shared training VM — check
-with `sudo ss -tlnp | grep ':808'` and pick a free port if 8081 is busy too:
+**Check whether Jenkins is already running before installing anything** — a
+shared or pre-provisioned VM often has it already:
+
+```bash
+sudo systemctl status jenkins --no-pager | head -3
+sudo ss -tlnp | grep ':8080'
+```
+
+If it is running, skip the install and go straight to step 2. The app deliberately
+uses 8090 so it coexists with a Jenkins on its default 8080.
+
+Only if you are installing fresh and something else holds 8080, move Jenkins:
 
 ```bash
 sudo mkdir -p /etc/systemd/system/jenkins.service.d
@@ -195,14 +204,25 @@ Install suggested plugins, then add **Pipeline**, **Git**, and
 
 Two extra things apply when the host is an EC2 instance.
 
-**Security group.** Nothing is reachable until you open the ports. Edit the
-instance's inbound rules to allow, ideally sourced to your own IP rather than
-`0.0.0.0/0`:
+**Reaching the UIs.** If you have no AWS console access, or would rather not open
+inbound ports at all, forward them over the SSH session instead. Run this from
+your own machine, not the VM, and leave it open:
+
+```bash
+ssh -L 8080:localhost:8080 -L 8090:localhost:8090 ec2-user@<vm-host>
+```
+
+Then `http://localhost:8080` is Jenkins and `http://localhost:8090` is the app.
+Reaching the app on `localhost` this way also makes biometric login work, which
+it would not over a public IP.
+
+Otherwise, open the ports in the instance's security group, sourced to your own
+IP rather than `0.0.0.0/0`:
 
 | Port | For |
 |---|---|
 | 8090 | the application |
-| 8081 | the Jenkins UI |
+| 8080 | the Jenkins UI |
 
 **Origin.** Set `WEBAUTHN_ORIGIN` in `.env.prod` to the URL you actually type,
 for example `http://<public-ip>:8090`, and `WEBAUTHN_RP_ID` to the bare host.
