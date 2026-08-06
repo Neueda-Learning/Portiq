@@ -17,7 +17,10 @@ import com.portiq.service.UploadValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.web.client.RestClientException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,6 +40,8 @@ import java.util.Map;
 @RequestMapping("/api/holdings")
 @Tag(name = "Holdings (flat)", description = "Cross-portfolio holdings, import, export, and history")
 public class HoldingsController {
+
+    private static final Logger log = LoggerFactory.getLogger(HoldingsController.class);
 
     private final HoldingService holdingService;
     private final PortfolioService portfolioService;
@@ -107,7 +112,22 @@ public class HoldingsController {
             try {
                 List<HoldingRequest> extracted = smartFileImportService.extractHoldings(file);
                 return ResponseEntity.ok(holdingImportService.importRequests(extracted));
-            } catch (Exception e) {
+            } catch (IOException e) {
+                // The upload itself could not be read - the client's problem to retry.
+                log.warn("Could not read the uploaded file for smart import", e);
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "That file could not be read. Try re-exporting it."));
+            } catch (RestClientException e) {
+                // The extraction model is unreachable or erroring. That is this server's
+                // dependency failing, not a bad upload, and 400 sent the user off re-saving a
+                // perfectly good spreadsheet.
+                log.warn("The import model call failed", e);
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .body(Map.of("message", "The import service is unavailable right now. Try again shortly."));
+            } catch (IllegalStateException e) {
+                // Raised by the extractor for content it understood but could not use - an empty
+                // file, or output that carried no transaction list. The message is written for
+                // the user, so it is passed through as-is.
                 return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
             }
         }
@@ -145,7 +165,15 @@ public class HoldingsController {
         try {
             List<HoldingRequest> extracted = statementScanService.extractHoldings(file);
             return ResponseEntity.ok(holdingImportService.importRequests(extracted));
-        } catch (Exception e) {
+        } catch (IOException e) {
+            log.warn("Could not read the uploaded statement image", e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "That image could not be read. Try uploading it again."));
+        } catch (RestClientException e) {
+            log.warn("The statement scanning model call failed", e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", "The scanning service is unavailable right now. Try again shortly."));
+        } catch (IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }

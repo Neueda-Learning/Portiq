@@ -142,9 +142,13 @@ public class AuthController {
             webAuthnService.verifyRegistration(user, body, label);
             audit.webauthnEvent("REGISTERED", user.getUsername(), "new credential stored");
             return ResponseEntity.ok(Map.of("registered", true));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // A malformed or unverifiable attestation from the browser. Distinct from anything
+            // else going wrong, which now falls through to GlobalExceptionHandler as a 500 with a
+            // traceable reference rather than being flattened into a 400 that hides the cause.
             audit.webauthnEvent("REGISTRATION_REJECTED", user.getUsername(), e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "That biometric credential could not be registered."));
         }
     }
 
@@ -181,11 +185,15 @@ public class AuthController {
                     jwtService.generateToken(user.getUsername()),
                     user.getUsername(),
                     true));
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // The verification checks WebAuthnService performs - challenge, origin, signature,
+            // sign counter - all surface as these. Anything else is a fault in this server, and
+            // now propagates to GlobalExceptionHandler to be logged with a traceable reference
+            // instead of being flattened into an indistinguishable 401.
             loginAttemptService.recordFailure(webauthnAccountKey(), clientIp);
             audit.loginFailed(webauthnAccountKey(), httpRequest, "webauthn assertion rejected: " + e.getMessage());
-            // The underlying reason names internal checks (challenge, signature, counter). It is
-            // useful in the log and useless to a legitimate user, so it stays out of the response.
+            // The underlying reason names internal checks. It is useful in the log and useless to
+            // a legitimate user, so it stays out of the response.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Biometric sign-in could not be verified"));
         }
