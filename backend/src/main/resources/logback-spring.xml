@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File logging for Portiq.
+
+  Everything went to the console before this, which means logs lived only as long as the terminal
+  or the container did. A crash at 2am left nothing to read afterwards, and the SECURITY events
+  the audit logger emits - failed logins, lockouts, blocked outbound requests - were the ones
+  least affordable to lose.
+
+  Three destinations, because they answer different questions:
+
+    logs/portiq.log          what the application did
+    logs/portiq-error.log    what went wrong, without scrolling past the noise
+    logs/portiq-security.log the audit trail, on its own so it can be shipped or alerted on
+                             without the rest, and kept far longer
+
+  All three roll daily and by size, with a total cap, so logging can never be what fills the disk.
+  Console output is unchanged, so running in the foreground looks exactly as it did.
+-->
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Overridable so a container can point these at a mounted volume. -->
+    <springProperty scope="context" name="logDir" source="app.logging.dir" defaultValue="logs"/>
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="portiq"/>
+
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{40} - %msg%n%wEx"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Everything the application logs. -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDir}/${appName}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${logDir}/archive/${appName}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Errors only. The first place to look, and short enough to read end to end. -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDir}/${appName}-error.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${logDir}/archive/${appName}-error-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!--
+      The security audit trail. Kept for a year rather than a fortnight: the question these lines
+      answer - "when did this account start being probed, and from where" - is usually asked long
+      after the fact, and a two-week window routinely predates the discovery of an incident.
+    -->
+    <appender name="SECURITY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDir}/${appName}-security.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${logDir}/archive/${appName}-security-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>365</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!--
+      Writes are handed to a background thread so a slow or full disk cannot stall a request.
+      neverBlock discards rather than waits if the queue fills: losing a few lines under extreme
+      load is strictly better than the log becoming the reason the application stops serving.
+    -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <!--
+      The security appender is deliberately NOT wrapped in an async one. These lines are the record
+      of an attack in progress, and they are low-volume by nature - dropping them under load is
+      exactly the wrong trade, since load is when they matter most.
+    -->
+    <logger name="SECURITY" level="INFO" additivity="false">
+        <appender-ref ref="SECURITY_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+
+    <!--
+      Tests write to the console only. Otherwise every `mvn test` run would litter logs/ with
+      files describing deliberately-provoked failures, which is noise that makes the real log
+      harder to trust.
+    -->
+    <springProfile name="test">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>
