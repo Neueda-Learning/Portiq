@@ -18,9 +18,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system spring && adduser --system --ingroup spring spring
-USER spring:spring
 
-COPY --from=build /app/target/*.jar app.jar
+# logback-spring.xml writes to logs/ relative to the working directory, and this
+# process runs unprivileged - so the directory has to exist and be owned by that
+# user before the switch. Creating it after USER is too late: /app still belongs
+# to root, Logback cannot create /app/logs, and Spring Boot treats a logging
+# configuration error as fatal - the JVM exits before the application context
+# starts, so nothing ever answers /actuator/health.
+RUN mkdir -p /app/logs && chown -R spring:spring /app
+
+COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
+
+USER spring:spring
 
 EXPOSE 4001
 
