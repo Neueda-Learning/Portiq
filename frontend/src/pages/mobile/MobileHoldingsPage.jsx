@@ -3,11 +3,13 @@ import Button from "../../components/common/Button";
 import Modal from "../../components/common/Modal";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Skeleton from "../../components/common/Skeleton";
+import ProgressBar from "../../components/common/ProgressBar";
 import HoldingForm from "../../components/holdings/HoldingForm";
 import HoldingCard from "../../components/mobile/HoldingCard";
 import { holdingsService } from "../../services/holdingsService";
 import { useToast } from "../../context/ToastContext";
 import { useInterval } from "../../utils/useInterval";
+import { NO_UPLOAD, uploadCopy } from "../../utils/uploadProgress";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -41,6 +43,7 @@ function MobileHoldingsPage() {
   const [importMessage, setImportMessage] = useState("");
   const [csvBusy, setCsvBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  const [upload, setUpload] = useState(NO_UPLOAD);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -173,8 +176,11 @@ function MobileHoldingsPage() {
     if (!file) return;
     setCsvBusy(true);
     setImportMessage("");
+    setUpload({ active: true, phase: "uploading", percent: 0, filename: file.name, kind: "file" });
     try {
-      const result = await holdingsService.importCsv(file);
+      const result = await holdingsService.importCsv(file, ({ phase, percent }) =>
+        setUpload((prev) => ({ ...prev, phase, percent }))
+      );
       const message =
         `Imported ${result.imported} holding(s) from ${file.name}.` +
         (result.errors?.length ? ` ${result.errors.length} row(s) skipped.` : "");
@@ -186,6 +192,7 @@ function MobileHoldingsPage() {
       toast.error(error.message);
     } finally {
       setCsvBusy(false);
+      setUpload(NO_UPLOAD);
     }
   }
 
@@ -195,8 +202,11 @@ function MobileHoldingsPage() {
     if (!file) return;
     setImageBusy(true);
     setImportMessage("");
+    setUpload({ active: true, phase: "uploading", percent: 0, filename: file.name, kind: "image" });
     try {
-      const result = await holdingsService.importImage(file);
+      const result = await holdingsService.importImage(file, ({ phase, percent }) =>
+        setUpload((prev) => ({ ...prev, phase, percent }))
+      );
       const message =
         `Imported ${result.imported} holding(s) from the image.` +
         (result.errors?.length ? ` ${result.errors.length} row(s) skipped.` : "");
@@ -208,6 +218,7 @@ function MobileHoldingsPage() {
       toast.error(error.message);
     } finally {
       setImageBusy(false);
+      setUpload(NO_UPLOAD);
     }
   }
 
@@ -373,7 +384,18 @@ function MobileHoldingsPage() {
           onChange={handleCsvSelected}
         />
         <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageSelected} />
-        {importMessage && <p className="meta-line section-gap-sm">{importMessage}</p>}
+        {upload.active && (
+          <ProgressBar
+            className="import-progress section-gap-sm"
+            value={upload.percent}
+            indeterminate={upload.phase === "processing"}
+            label={`${uploadCopy(upload.phase, upload.kind).label} · ${upload.filename}`}
+            detail={uploadCopy(upload.phase, upload.kind).detail}
+          />
+        )}
+        {!upload.active && importMessage && (
+          <p className="meta-line section-gap-sm">{importMessage}</p>
+        )}
         <p className="meta-line section-gap-sm">
           Any CSV or Excel layout is accepted, including broker order histories. Importing a ticker you already hold
           updates its quantity and average price instead of duplicating it.

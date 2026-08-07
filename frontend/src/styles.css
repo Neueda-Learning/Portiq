@@ -2051,3 +2051,86 @@ tbody tr:hover {
   border-radius: 8px;
   background: rgba(127, 127, 127, 0.12);
 }
+
+/* --- Import progress -------------------------------------------------------
+   Two visual states, matching the two phases of an upload. The determinate bar
+   fills to a real percentage while bytes go up; the indeterminate one sweeps
+   while the server works, because there is no honest number to show once the
+   file has landed and a model is reading it. */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-progress {
+  margin-top: 12px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-percent {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  /* Stops the label shifting left and right as the digits change. */
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.progress-track.is-indeterminate .progress-fill {
+  width: 40%;
+  animation: progress-sweep 1.15s ease-in-out infinite;
+}
+
+@keyframes progress-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+.progress-detail {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Without a sweep there is no signal that anything is happening, so the bar
+   becomes a steady half-width block plus the wording above it, rather than
+   disappearing entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .progress-track.is-indeterminate .progress-fill {
+    animation: none;
+    width: 50%;
+    opacity: 0.7;
+  }
+  .progress-fill {
+    transition: none;
+  }
+}
