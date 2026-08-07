@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { triggerHaptic } from "../utils/haptics";
+import { CloseIcon } from "../components/common/icons";
 
 const ToastContext = createContext(null);
 let idCounter = 0;
@@ -50,7 +51,7 @@ export function ToastProvider({ children }) {
           <div key={toast.id} className={`toast toast-${toast.type}`} role="status">
             <span>{toast.message}</span>
             <button className="toast-close" onClick={() => dismiss(toast.id)} aria-label="Dismiss notification">
-              &#10005;
+              <CloseIcon size={14} />
             </button>
           </div>
         ))}

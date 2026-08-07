@@ -155,6 +155,17 @@ h4 {
   border-radius: 999px;
   color: var(--text-secondary);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-toggle:hover,
+.sidebar-close:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .sidebar-close {
@@ -197,9 +208,19 @@ h4 {
 
 .nav-icon {
   width: 18px;
-  text-align: center;
+  height: 18px;
   flex: none;
-  opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Slightly lighter than the label so the word leads and the icon supports it. Applied to the
+     wrapper rather than the svg so the icon still inherits the link's colour, including active. */
+  opacity: 0.85;
+}
+
+/* The active row earns full-strength icons - the difference is what makes the selection read. */
+.sidebar-nav a.active .nav-icon {
+  opacity: 1;
 }
 
 .nav-icon-only {
@@ -237,7 +258,9 @@ h4 {
 }
 
 .sidebar.collapsed .nav-icon-only {
-  display: inline;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-backdrop,
