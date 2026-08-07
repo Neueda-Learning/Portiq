@@ -3,6 +3,17 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { authService } from "../../services/authService";
 import { isWebAuthnSupported, registerBiometricCredential } from "../../utils/webauthn";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  DashboardIcon,
+  FingerprintIcon,
+  HoldingsIcon,
+  LogOutIcon,
+  RecommendationsIcon,
+  RiskIcon,
+} from "./icons";
 
 function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
   const { username, biometricEnabled, logout, setBiometricEnabled } = useAuth();
@@ -37,29 +48,34 @@ function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
       <aside className={`sidebar ${collapsed ? "collapsed" : ""} ${mobileOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-header">
           <div className="brand">{collapsed ? "P" : "Portiq"}</div>
-          <button className="sidebar-toggle" onClick={onToggleCollapse} title="Collapse sidebar" aria-label="Collapse sidebar">
-            {collapsed ? "»" : "«"}
+          <button
+            className="sidebar-toggle"
+            onClick={onToggleCollapse}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronRightIcon size={16} /> : <ChevronLeftIcon size={16} />}
           </button>
           <button className="sidebar-close" onClick={onCloseMobile} aria-label="Close menu">
-            &#10005;
+            <CloseIcon size={16} />
           </button>
         </div>
 
         <nav className="sidebar-nav">
           <NavLink to="/" end onClick={onCloseMobile} title="Dashboard">
-            <span className="nav-icon">&#9638;</span>
+            <span className="nav-icon"><DashboardIcon /></span>
             <span className="nav-label">Dashboard</span>
           </NavLink>
           <NavLink to="/holdings" onClick={onCloseMobile} title="Holdings">
-            <span className="nav-icon">&#9636;</span>
+            <span className="nav-icon"><HoldingsIcon /></span>
             <span className="nav-label">Holdings</span>
           </NavLink>
           <NavLink to="/recommendations" onClick={onCloseMobile} title="Recommendations">
-            <span className="nav-icon">&#9678;</span>
+            <span className="nav-icon"><RecommendationsIcon /></span>
             <span className="nav-label">Recommendations</span>
           </NavLink>
           <NavLink to="/risk" onClick={onCloseMobile} title="Risk">
-            <span className="nav-icon">&#9650;</span>
+            <span className="nav-icon"><RiskIcon /></span>
             <span className="nav-label">Risk</span>
           </NavLink>
         </nav>
@@ -68,7 +84,7 @@ function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
           {isWebAuthnSupported() && !biometricEnabled && (
             <button className="link-btn full-width" onClick={handleEnrollBiometric} disabled={enrolling}>
               <span className="nav-label">{enrolling ? "Enabling..." : "Enable Biometrics"}</span>
-              <span className="nav-icon-only">&#128272;</span>
+              <span className="nav-icon-only"><FingerprintIcon /></span>
             </button>
           )}
           {message && <p className="meta-line sidebar-message">{message}</p>}
@@ -77,7 +93,7 @@ function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
           </div>
           <button className="link-btn full-width" onClick={handleLogout} title="Log out">
             <span className="nav-label">Log out</span>
-            <span className="nav-icon-only">&#9099;</span>
+            <span className="nav-icon-only"><LogOutIcon /></span>
           </button>
         </div>
       </aside>
